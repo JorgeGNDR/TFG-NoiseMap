@@ -2,63 +2,81 @@ package com.gandara.tfgjorgegandara.dsp
 
 import org.jtransforms.fft.FloatFFT_1D
 import kotlin.math.log10
+import kotlin.math.pow
 import kotlin.math.sqrt
 
 class FFTCalculator(private val bufferSize: Int) {
-    // Instanciamos el motor matemático.
     private val fft = FloatFFT_1D(bufferSize.toLong())
+    private val halfSize = bufferSize / 2
+    private val floatData = FloatArray(bufferSize)
+
+    data class WeightedResults(val a: Double, val c: Double, val z: Double, val spectrum: FloatArray)
 
     /**
-     * Recibe un bloque de audio bruto (PCM 16-bit) y devuelve un array con los niveles
-     * en Decibelios (dB) para cada "banda" de frecuencia.
+     * Calcula las ponderaciones A, C y Z y devuelve el espectro completo.
      */
-    fun calculateFFT(audioSamples: ShortArray, offset: Float = 90f): FloatArray {
-        // 1. Convertir y normalizar los datos de audio a valores de punto flotante.
-        // Pasamos de Short a Float y dividimos por 32768.0 para normalizar.
-        val floatData = FloatArray(bufferSize)
+    fun calculateWeightings(audioSamples: ShortArray, sampleRate: Int, offset: Float): WeightedResults {
+        // 1. Preparar datos y ejecutar FFT
+        performFFT(audioSamples)
+
+        var energyA = 0.0
+        var energyC = 0.0
+        var energyZ = 0.0
+        val spectrumZ = FloatArray(halfSize)
+        val binSize = sampleRate.toDouble() / bufferSize
+
+        for (i in 0 until halfSize) {
+            val real = floatData[if (i == 0) 0 else 2 * i]
+            val imag = if (i == 0) 0f else if (i == halfSize - 1) floatData[1] else floatData[2 * i + 1]
+
+            val magnitude = sqrt(real * real + imag * imag)
+            val amplitude = (magnitude * 4.0f) / bufferSize 
+            val freq = i * binSize
+
+            if (amplitude > 1e-12) {
+                val dbZ = 20 * log10(amplitude.toDouble()) + offset
+                spectrumZ[i] = dbZ.toFloat()
+
+                // Acumulación de energía con ponderaciones
+                val weightA = getAWeight(freq)
+                val weightC = getCWeight(freq)
+
+                energyZ += 10.0.pow(dbZ / 10.0)
+                energyA += 10.0.pow((dbZ + weightA) / 10.0)
+                energyC += 10.0.pow((dbZ + weightC) / 10.0)
+            } else {
+                spectrumZ[i] = -20f
+            }
+        }
+
+        return WeightedResults(
+            a = if (energyA > 0) 10 * log10(energyA) else 0.0,
+            c = if (energyC > 0) 10 * log10(energyC) else 0.0,
+            z = if (energyZ > 0) 10 * log10(energyZ) else 0.0,
+            spectrum = spectrumZ
+        )
+    }
+
+    private fun performFFT(audioSamples: ShortArray) {
         for (i in audioSamples.indices) {
             floatData[i] = audioSamples[i].toFloat() / 32768.0f
         }
-
-        // 2. Aplicar la ventana de Hann a los datos.
         WindowingFunctions.applyHannWindow(floatData)
-
-        // 3. Calcular la FFT.
         fft.realForward(floatData)
-
-        // 4. Calcular los niveles en decibelios (dB) para cada banda de frecuencia.
-        // Teorema de Nyquist: de 1024 muestras, solo obtenemos 512 frecuencias.
-        val halfSize = bufferSize / 2
-        val levels = FloatArray(halfSize)
-
-        // JTransforms empaqueta los datos en un array de números complejos:
-        // floatData[0] = Parte real de 0 Hz
-        // floatData[1] = Parte real de la máxima frecuencia
-        // A partir del indice 2 van en parejas: [Real, Imaginario, Real, Imaginario...]
-
-        // Calculamos la primera barra (0 Hz o Corriente Continua)
-        levels[0] = calculateMagnitudInDb(floatData[0], 0f, offset)
-
-        // Calculamos las demás barras (Frecuencias)
-        for (i in 1 until halfSize) {
-            val realPart = floatData[2 * i]
-            val imaginaryPart = floatData[2 * i + 1]
-            levels[i] = calculateMagnitudInDb(realPart, imaginaryPart, offset)
-        }
-
-        return levels // Array que enviamos a la UI
     }
 
-    private fun calculateMagnitudInDb(real: Float, imaginary: Float, offset: Float): Float {
-        // Magnitud de un número complejo: sqrt(a^2 + b^2)
-        val magnitude = sqrt(real * real + imaginary * imaginary)
-        // Decibeles (dB): 20 * log10(magnitud) + offset
-        return if (magnitude > 0) {
-            var db = 20f * log10(magnitude) + offset
-            if (db < 0f) db = 0f
-            db
-        } else {
-            0f
-        }
+    fun getAWeight(f: Double): Double {
+        if (f < 20.0) return -50.0
+        val f2 = f * f
+        val rA = (12194.0.pow(2) * f.pow(4)) / 
+                ((f2 + 20.6.pow(2)) * sqrt((f2 + 107.7.pow(2)) * (f2 + 737.9.pow(2))) * (f2 + 12194.0.pow(2)))
+        return 20 * log10(rA) + 2.0
+    }
+    
+    fun getCWeight(f: Double): Double {
+        if (f < 20.0) return -0.8
+        val f2 = f * f
+        val rC = (12194.0.pow(2) * f2) / ((f2 + 20.6.pow(2)) * (f2 + 12194.0.pow(2)))
+        return 20 * log10(rC) + 0.06
     }
 }

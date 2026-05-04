@@ -65,13 +65,16 @@ dependencies {
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1") // Uso de KSP para generar código de compilación
 
-
-
     // OSMDroid (Mapas)
     implementation("org.osmdroid:osmdroid-android:6.1.18")
 
-    // SDK de Gemini (IA)
-    implementation("com.google.ai.client.generativeai:generativeai:0.2.2")
+    // implementar api gemini
+    //
+
+    // YAMNNET (TFLite)
+    implementation(libs.tensorflow.lite)
+    implementation("org.tensorflow:tensorflow-lite-task-audio:0.4.4")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
 
     // JTransforms (Matemáticas y FFT)
     implementation("com.github.wendykierp:JTransforms:3.1")

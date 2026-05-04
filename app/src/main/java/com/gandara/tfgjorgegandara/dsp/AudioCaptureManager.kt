@@ -6,20 +6,21 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import kotlinx.coroutines.*
 import kotlin.math.log10
+import kotlin.math.max
 import kotlin.math.sqrt
 
 class AudioCaptureManager {
-    //Configuración del audio
     private val sampleRate = 44100
     private val channelConfig = AudioFormat.CHANNEL_IN_MONO
     private val audioFormat = AudioFormat.ENCODING_PCM_16BIT
+    private val FFT_SIZE = 4096
 
-    //Buffer
-    private val bufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
+    private val minHardwareBuffer = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
+    private val safeBufferSizeInBytes = max(minHardwareBuffer, FFT_SIZE * 2)
 
     private var audioRecord: AudioRecord? = null
     private var isRecording = false
-    var offset = 90.0
+    var offset = 100.0
 
     private var captureJob: Job? = null
     private val captureScope = CoroutineScope(Dispatchers.IO)
@@ -33,23 +34,18 @@ class AudioCaptureManager {
             sampleRate,
             channelConfig,
             audioFormat,
-            bufferSize
+            safeBufferSizeInBytes
         )
-        val dataBuffer = ShortArray(1024)
 
+        val dataBuffer = ShortArray(FFT_SIZE)
         isRecording = true
         audioRecord?.startRecording()
 
-        // Lanzamos corrutina para leer los datos del audio en segundo plano
         captureJob = captureScope.launch {
             while (isActive && isRecording) {
-                val bytesRead = audioRecord?.read(dataBuffer, 0, dataBuffer.size) ?: 0
-
-                if (bytesRead > 0) {
-                    // Cálculo de decibelios
+                val samplesRead = audioRecord?.read(dataBuffer, 0, dataBuffer.size) ?: 0
+                if (samplesRead == dataBuffer.size) {
                     val db = calculateDb(dataBuffer)
-
-                    // Enviamos datos (buffer y db) a la UI
                     onDataReady(dataBuffer.clone(), db)
                 }
             }
@@ -58,26 +54,33 @@ class AudioCaptureManager {
 
     fun stopRecording() {
         isRecording = false
-        // Cancelamos la corrutina limpiamente
         captureJob?.cancel()
         captureJob = null
-
         audioRecord?.stop()
         audioRecord?.release()
         audioRecord = null
     }
 
-    // Cálculo de decibelios
+    /**
+     * Calcula el nivel de presión sonora (dB SPL aproximado) usando RMS.
+     * Es la referencia estándar para el medidor numérico principal.
+     */
     private fun calculateDb(samples: ShortArray): Double {
-        var sum = 0.0
+        var sumOfSquares = 0.0
         for (sample in samples) {
-            sum += (sample * sample).toDouble()
+            // Normalizamos la muestra de 16 bits a rango -1.0 a 1.0
+            val normalized = sample / 32768.0
+            sumOfSquares += normalized * normalized
         }
-        //RMS (Root Mean Square) es el promedio de la energía de la onda (Amplitud)
-        val rms = sqrt(sum / samples.size)
+        
+        // Valor eficaz (Root Mean Square)
+        val rms = sqrt(sumOfSquares / samples.size)
 
-        //Fórmula decibelios: 20 * log10(RMS)
-        // Usamos 32767.0 como referencia porque es el valor máximo de un Short (16 bits)
-        return if (rms > 0) 20 * log10(rms / 32767.0) + offset else 0.0
+        // Conversión a decibelios con el offset de calibración
+        return if (rms > 1e-9) { // Evitar log10 de cero o valores ínfimos
+            20 * log10(rms) + offset
+        } else {
+            0.0
+        }
     }
 }
