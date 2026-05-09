@@ -1,0 +1,103 @@
+package com.gandara.tfgjorgegandara.ui.history
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.gandara.tfgjorgegandara.data.local.AudioSample
+import java.text.SimpleDateFormat
+import java.util.*
+
+/**
+ * Pantalla de histórico que permite explorar las mediciones pasadas y sus metadatos detallados.
+ */
+@Composable
+fun HistoryScreen(viewModel: HistoryViewModel) {
+    val samples by viewModel.samples.collectAsState()
+    val details by viewModel.selectedSampleDetails.collectAsState()
+
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Text(
+            text = "Historial de Muestras",
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            items(samples) { sample ->
+                SampleItem(
+                    sample = sample,
+                    isSelected = details?.sample?.id == sample.id,
+                    onClick = { viewModel.loadSampleDetails(sample) },
+                    details = if (details?.sample?.id == sample.id) details else null
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Representación visual de una medición individual dentro del listado.
+ */
+@Composable
+fun SampleItem(
+    sample: AudioSample, 
+    isSelected: Boolean, 
+    onClick: () -> Unit,
+    details: FullSampleData?
+) {
+    val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
+    val dateString = dateFormat.format(Date(sample.timestamp))
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clickable { onClick() },
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("ID: ${sample.id}", style = MaterialTheme.typography.labelLarge)
+                Text(dateString, style = MaterialTheme.typography.bodySmall)
+            }
+            
+            Text(
+                text = "Nivel: ${"%.1f".format(sample.avgDb)} dB (${sample.weighting})",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold
+            )
+
+            // Panel expansible con detalles adicionales (IA y Ubicación)
+            AnimatedVisibility(visible = isSelected) {
+                Column(modifier = Modifier.padding(top = 8.dp)) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    Text("📍 Ubicación: ${sample.latitude}, ${sample.longitude}", style = MaterialTheme.typography.bodyMedium)
+                    Text("🚀 Nivel Pico: ${"%.1f".format(sample.peakDb)} dB", style = MaterialTheme.typography.bodyMedium)
+                    
+                    details?.let { d ->
+                        if (d.classifications.isNotEmpty()) {
+                            val classificationText = d.classifications.joinToString { 
+                                "${it.label} (${"%.0f".format(it.probability * 100)}%)" 
+                            }
+                            Text("🤖 IA: $classificationText", style = MaterialTheme.typography.bodyMedium)
+                        }
+                        if (d.bins.isNotEmpty()) {
+                            Text("📊 Resolución espectral: ${d.bins.size} bandas registradas", style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

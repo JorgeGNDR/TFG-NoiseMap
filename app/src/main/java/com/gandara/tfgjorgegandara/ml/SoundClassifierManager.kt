@@ -7,6 +7,10 @@ import org.tensorflow.lite.task.audio.classifier.AudioClassifier
 import org.tensorflow.lite.support.audio.TensorAudio
 import org.tensorflow.lite.task.core.BaseOptions
 
+/**
+ * Gestor del motor de inferencia TensorFlow Lite para la clasificación de sonidos ambientales.
+ * Utiliza el modelo pre-entrenado YAMNet.
+ */
 class SoundClassifierManager(context: Context) {
     private var classifier: AudioClassifier? = null
     private var tensorAudio: TensorAudio? = null
@@ -29,62 +33,73 @@ class SoundClassifierManager(context: Context) {
                 .setMaxResults(3)
                 .build()
 
+            // Inicialización del motor de TFLite
             classifier = AudioClassifier.createFromFileAndOptions(context, MODEL_PATH, options)
             
-            // Creamos el Tensor y el AudioRecord configurados AUTOMÁTICAMENTE para el modelo (16kHz)
+            // Configuración automatizada del buffer de audio conforme a los requisitos del modelo (16kHz)
             tensorAudio = classifier?.createInputTensorAudio()
             audioRecord = classifier?.createAudioRecord()
 
-            Log.d(TAG, "YAMNet cargado y AudioRecord listo a 16kHz")
+            Log.d(TAG, "Motor de inteligencia artificial inicializado correctamente.")
         } catch (e: Exception) {
-            Log.e(TAG, "Error al cargar el modelo YAMNet. ¿Está el archivo en assets?", e)
+            Log.e(TAG, "Fallo al cargar el modelo YAMNet: ${e.message}")
         }
     }
 
+    /**
+     * Inicia la captura de audio en el hilo de procesamiento de audio.
+     */
     fun start() {
         try {
             audioRecord?.startRecording()
-            Log.d(TAG, "Grabación para IA iniciada")
         } catch (e: Exception) {
-            Log.e(TAG, "No se pudo iniciar la grabación para IA", e)
+            Log.e(TAG, "No se pudo activar la captura para el motor ML: ${e.message}")
         }
     }
 
+    /**
+     * Detiene la captura de audio.
+     */
     fun stop() {
         try {
             audioRecord?.stop()
         } catch (e: Exception) {
-            Log.e(TAG, "Error al detener grabación", e)
+            Log.e(TAG, "Error al detener la captura ML.")
         }
     }
 
+    /**
+     * Realiza la clasificación del sonido actual basándose en el buffer proporcionado.
+     */
     fun classify(resampled: FloatArray): String {
-        val currentClassifier = classifier ?: return "Iniciando..."
-        val currentRecord = audioRecord ?: return "Error Micro"
-        val currentTensor = tensorAudio ?: return "Error Memoria"
+        val currentClassifier = classifier ?: return "Inicializando..."
+        val currentTensor = tensorAudio ?: return "Error de memoria"
 
         return try {
-            currentTensor.load(currentRecord)
+            currentTensor.load(resampled, 0, resampled.size)
             val results = currentClassifier.classify(currentTensor)
             val topCategory = results.firstOrNull()?.categories?.firstOrNull()
 
             if (topCategory != null) {
                 "${topCategory.label} (${(topCategory.score * 100).toInt()}%)"
             } else {
-                "RUIDO DE FONDO"
+                "AMBIENTE"
             }
         } catch (e: Exception) {
             "Analizando..."
         }
     }
 
+    /**
+     * Libera los recursos del motor de inferencia y la captura de audio.
+     */
     fun close() {
         try {
             stop()
             audioRecord?.release()
             classifier?.close()
         } catch (e: Exception) {
-            Log.e(TAG, "Error al cerrar el manager", e)
+            Log.e(TAG, "Error al liberar recursos del gestor ML.")
         }
     }
 }

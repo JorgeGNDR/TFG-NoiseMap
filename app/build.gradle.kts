@@ -39,6 +39,7 @@ android {
     }
     buildFeatures {
         compose = true
+        viewBinding = true
     }
 }
 
@@ -61,12 +62,18 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     // Room (Base de datos)
-    implementation("androidx.room:room-runtime:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
-    ksp("androidx.room:room-compiler:2.6.1") // Uso de KSP para generar código de compilación
+    val room_version = "2.6.1"
+    implementation("androidx.room:room-runtime:$room_version")
+    implementation("androidx.room:room-ktx:$room_version")
+    ksp("androidx.room:room-compiler:$room_version") // Uso de KSP para generar código de compilación
+
+    // Google Play Services Location
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+
 
     // OSMDroid (Mapas)
     implementation("org.osmdroid:osmdroid-android:6.1.18")
+    implementation(libs.play.services.location)
 
     // implementar api gemini
     //

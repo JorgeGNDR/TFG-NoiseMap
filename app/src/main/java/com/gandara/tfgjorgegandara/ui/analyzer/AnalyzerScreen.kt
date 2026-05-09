@@ -15,36 +15,39 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.isEmpty
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.gandara.tfgjorgegandara.ui.common.LocationViewModel
 
 import com.gandara.tfgjorgegandara.R
-import com.gandara.tfgjorgegandara.ui.viewmodels.AnalyzerViewModel
-import com.gandara.tfgjorgegandara.ui.viewmodels.WeightingType
 import com.gandara.tfgjorgegandara.ui.theme.*
-import com.gandara.tfgjorgegandara.ui.viewmodels.AnalyzerState
 
+/**
+ * Pantalla principal del analizador acústico.
+ * Visualiza niveles de presión sonora, espectro de frecuencias e identificación de sonidos.
+ */
 @Composable
 fun AnalyzerScreen(
-    viewModel: AnalyzerViewModel = viewModel()
+    viewModel: AnalyzerViewModel = viewModel(),
+    locationViewModel: LocationViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val currentLocation by locationViewModel.currentLocation.collectAsState()
     val interactionSource = remember { MutableInteractionSource() }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(NeumorphicBackground)
-            .padding(horizontal = 12.dp, vertical = 40.dp),
+            .padding(horizontal = 12.dp)
+            .padding(top = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Indicadores Superiores
+        // Región de indicadores numéricos principales (AVG, dB actual, PEAK)
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -77,7 +80,7 @@ fun AnalyzerScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Selector Ponderación + Botón Pausa
+        // Controles de configuración (Ponderación y Congelación de señal)
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -107,7 +110,6 @@ fun AnalyzerScreen(
                 }
             }
 
-            // Botón de Pausa (Freeze) usando Drawables
             Box(
                 modifier = Modifier
                     .size(44.dp)
@@ -120,7 +122,7 @@ fun AnalyzerScreen(
                     painter = painterResource(
                         id = if (state.isPaused) R.drawable.play_arrow_24px else R.drawable.pause_24px
                     ),
-                    contentDescription = "Pausa",
+                    contentDescription = "Control de pausa",
                     tint = if (state.isPaused) RecordRed else TextDark,
                     modifier = Modifier.size(24.dp)
                 )
@@ -129,7 +131,7 @@ fun AnalyzerScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Contenedor de la Gráfica
+        // Visualización del espectrograma en tiempo real
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -144,9 +146,9 @@ fun AnalyzerScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
-        // Cuadro de estado dinámico
+        // Panel de información de estado, clasificación y diagnóstico GPS
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -157,9 +159,9 @@ fun AnalyzerScreen(
         ) {
             Column {
                 val statusText = when {
-                    state.isCapturing -> "Capturando muestra: ${(state.captureProgress * 100).toInt()}%"
-                    state.isPaused -> "Señal congelada (Pausa)"
-                    else -> "Identificando: ${state.detectedSound.uppercase()}"
+                    state.isCapturing -> "GRABANDO MUESTRA: ${(state.captureProgress * 100).toInt()}%"
+                    state.isPaused -> "SEÑAL CONGELADA"
+                    else -> state.detectedSound.ifEmpty { "Escuchando..." }.uppercase()
                 }
                 Text(
                     text = statusText,
@@ -168,32 +170,27 @@ fun AnalyzerScreen(
                     color = if (state.isCapturing) RecordRed else TextDark
                 )
 
-                if (!state.isCapturing && !state.isPaused) {
-                    Text(
-                        text = "Escucha activa ambiental...",
-                        fontSize = 12.sp,
-                        color = TextGray
-                    )
-                }
+                Text(
+                    text = if (currentLocation != null) "📍 Lat: ${"%.4f".format(currentLocation?.latitude)}, Lon: ${"%.4f".format(currentLocation?.longitude)}"
+                    else "⏳ Esperando señal GPS...",
+                    fontSize = 10.sp,
+                    color = if (currentLocation != null) Color.Gray else RecordRed,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
-        SoundDebugPanel(state = state)
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        // Botón de Captura (5 Segundos)
+        // Accionador principal de captura geolocalizada
         Box(
             modifier = Modifier
-                .size(85.dp)
+                .size(65.dp)
                 .neumorphic(cornerRadius = 42.dp)
                 .background(NeumorphicBackground, shape = CircleShape)
-                .clickable { viewModel.startCaptureSession() },
+                .clickable { viewModel.startCaptureSession(currentLocation) },
             contentAlignment = Alignment.Center
         ) {
-            // Círculo interno que cambia según si está capturando
             Box(
                 modifier = Modifier
                     .size(if (state.isCapturing) 30.dp else 45.dp)
@@ -201,52 +198,7 @@ fun AnalyzerScreen(
                     .background(if (state.isCapturing) TextGray else RecordRed)
             )
         }
-
-        Spacer(modifier = Modifier.height(10.dp))
-        Text("CAPTURAR", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextGray)
+        
+        Spacer(modifier = Modifier.height(16.dp))
     }
-}
-
-@Composable
-fun SoundDebugPanel(state: AnalyzerState) {Column(
-    modifier = Modifier
-        .fillMaxWidth()
-        .padding(16.dp)
-        .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(12.dp)) // Más oscuro y redondeado
-        .padding(16.dp)
-) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .clip(CircleShape)
-                .background(if (state.isPaused) Color.Gray else Color.Red)
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = "ANÁLISIS EN TIEMPO REAL",
-            color = Color.Yellow,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 12.sp,
-            letterSpacing = 1.sp
-        )
-    }
-
-    Spacer(modifier = Modifier.height(12.dp))
-
-    val displayText = if (state.detectedSound.isEmpty()) "Escuchando..." else state.detectedSound
-
-    Text(
-        text = displayText,
-        color = Color.White,
-        fontSize = 22.sp, // Más grande para que destaque
-        fontWeight = FontWeight.Bold
-    )
-
-    Text(
-        text = if (state.isPaused) "Análisis pausado" else "Detectando patrones sonoros...",
-        color = Color.White.copy(alpha = 0.6f),
-        fontSize = 11.sp
-    )
-}
 }
