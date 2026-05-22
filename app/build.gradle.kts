@@ -2,7 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    id("com.google.devtools.ksp") version "2.0.21-1.0.28"
+    id("com.google.devtools.ksp") version "2.1.10-1.0.29"
 }
 
 android {
@@ -70,13 +70,11 @@ dependencies {
     // Google Play Services Location
     implementation("com.google.android.gms:play-services-location:21.3.0")
 
-
-    // OSMDroid (Mapas)
-    implementation("org.osmdroid:osmdroid-android:6.1.18")
-    implementation(libs.play.services.location)
+    // MapLibre (Mapas vectoriales y heatmap profesional)
+    implementation("org.maplibre.gl:android-sdk:13.1.0")
 
     // implementar api gemini
-    //
+    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
 
     // YAMNNET (TFLite)
     implementation(libs.tensorflow.lite)

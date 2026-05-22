@@ -29,7 +29,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import org.osmdroid.config.Configuration
+import org.maplibre.android.MapLibre
 
 import com.gandara.tfgjorgegandara.ui.analyzer.AnalyzerScreen
 import com.gandara.tfgjorgegandara.ui.map.MapScreen
@@ -55,8 +55,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Configuración necesaria para el correcto funcionamiento de OSMDroid
-        Configuration.getInstance().load(this, getSharedPreferences("osmdroid", MODE_PRIVATE))
+        // Inicialización de MapLibre (requerido antes de setContent)
+        MapLibre.getInstance(this)
 
         setContent {
             NoiseMapTheme {
@@ -132,7 +132,12 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.Analyzer.route) {
                             AnalyzerScreen(locationViewModel = locationViewModel)
                         }
-                        composable(Screen.Map.route) { MapScreen(onNavigateBack = { navController.popBackStack() }) }
+                        composable(Screen.Map.route) { 
+                            MapScreen(
+                                onNavigateBack = { navController.popBackStack() },
+                                locationViewModel = locationViewModel
+                            ) 
+                        }
                         composable(Screen.History.route) {
                             val historyViewModel: HistoryViewModel = viewModel()
                             HistoryScreen(viewModel = historyViewModel)

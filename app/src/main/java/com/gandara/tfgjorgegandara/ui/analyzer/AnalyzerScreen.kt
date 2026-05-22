@@ -135,7 +135,7 @@ fun AnalyzerScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(280.dp)
+                .height(230.dp)
                 .neumorphic(cornerRadius = 16.dp)
                 .background(NeumorphicBackground, shape = RoundedCornerShape(16.dp))
                 .padding(12.dp)
@@ -152,6 +152,7 @@ fun AnalyzerScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .height(120.dp)
                 .padding(horizontal = 8.dp)
                 .neumorphic(cornerRadius = 16.dp)
                 .background(NeumorphicBackground, shape = RoundedCornerShape(16.dp))
@@ -168,14 +169,6 @@ fun AnalyzerScreen(
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = if (state.isCapturing) RecordRed else TextDark
-                )
-
-                Text(
-                    text = if (currentLocation != null) "📍 Lat: ${"%.4f".format(currentLocation?.latitude)}, Lon: ${"%.4f".format(currentLocation?.longitude)}"
-                    else "⏳ Esperando señal GPS...",
-                    fontSize = 10.sp,
-                    color = if (currentLocation != null) Color.Gray else RecordRed,
-                    modifier = Modifier.padding(top = 4.dp)
                 )
             }
         }

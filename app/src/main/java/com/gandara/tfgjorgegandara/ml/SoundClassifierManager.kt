@@ -30,7 +30,7 @@ class SoundClassifierManager(context: Context) {
             val options = AudioClassifier.AudioClassifierOptions.builder()
                 .setBaseOptions(baseOptions)
                 .setScoreThreshold(0.3f)
-                .setMaxResults(3)
+                .setMaxResults(2)
                 .build()
 
             // Inicialización del motor de TFLite
@@ -69,7 +69,31 @@ class SoundClassifierManager(context: Context) {
     }
 
     /**
-     * Realiza la clasificación del sonido actual basándose en el buffer proporcionado.
+     * Realiza la clasificación del sonido actual leyendo directamente de su propio flujo de audio.
+     * Este método garantiza que YAMNet reciba el contexto completo (aprox 1s) que necesita.
+     */
+    fun classifyContinuous(): String {
+        val currentClassifier = classifier ?: return "Inicializando..."
+        val currentTensor = tensorAudio ?: return "Cargando..."
+
+        return try {
+            // Lee los datos del micrófono interno configurado por TensorFlow a 16kHz
+            currentTensor.load(audioRecord)
+            val results = currentClassifier.classify(currentTensor)
+            val topCategory = results.firstOrNull()?.categories?.firstOrNull()
+
+            if (topCategory != null && topCategory.score > 0.3f) {
+                "${topCategory.label} (${(topCategory.score * 100).toInt()}%)"
+            } else {
+                "NULL"
+            }
+        } catch (e: Exception) {
+            "Analizando..."
+        }
+    }
+
+    /**
+     * Realiza la clasificación de un fragmento de audio específico (usado en post-procesamiento).
      */
     fun classify(resampled: FloatArray): String {
         val currentClassifier = classifier ?: return "Inicializando..."
@@ -83,7 +107,7 @@ class SoundClassifierManager(context: Context) {
             if (topCategory != null) {
                 "${topCategory.label} (${(topCategory.score * 100).toInt()}%)"
             } else {
-                "AMBIENTE"
+                "NULL"
             }
         } catch (e: Exception) {
             "Analizando..."

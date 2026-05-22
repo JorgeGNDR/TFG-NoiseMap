@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import org.osmdroid.util.GeoPoint
 
 /**
  * ViewModel que gestiona la lógica de negocio de la pantalla del mapa,
@@ -33,9 +32,9 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     private val _selectedTimeRange = MutableStateFlow(24)
     val selectedTimeRange: StateFlow<Int> = _selectedTimeRange.asStateFlow()
 
-    // Filtro de banda de frecuencia seleccionada
-    private val _selectedFrequencyBand = MutableStateFlow("Global")
-    val selectedFrequencyBand: StateFlow<String> = _selectedFrequencyBand.asStateFlow()
+    // Filtro de banda de frecuencia seleccionada (-1 para Global/Todo el espectro)
+    private val _selectedBandIndex = MutableStateFlow(-1)
+    val selectedBandIndex: StateFlow<Int> = _selectedBandIndex.asStateFlow()
 
     // Límites actuales del mapa para refrescos dinámicos
     private var currentBounds: MapBounds? = null
@@ -69,10 +68,10 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Actualiza el filtro de frecuencia para el mapa de calor.
+     * Actualiza el filtro de frecuencia para el mapa de calor mediante índice.
      */
-    fun setFrequencyBand(band: String) {
-        _selectedFrequencyBand.value = band
+    fun setFrequencyBandIndex(index: Int) {
+        _selectedBandIndex.value = index
         refreshHeatmap()
     }
 
@@ -93,22 +92,18 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         updateJob = viewModelScope.launch {
             _isLoading.value = true
             try {
-                val bandName = _selectedFrequencyBand.value
+                val bandIndex = _selectedBandIndex.value
                 val hours = _selectedTimeRange.value
 
-                // Selección de fuente de datos según el filtro de frecuencia
-                val tiles = when (bandName) {
-                    "Bajos" -> repository.getHeatmapByFrequency(10, minLat, maxLat, minLon, maxLon)
-                    "Medios" -> repository.getHeatmapByFrequency(100, minLat, maxLat, minLon, maxLon)
-                    "Agudos" -> repository.getHeatmapByFrequency(500, minLat, maxLat, minLon, maxLon)
-                    else -> repository.getTilesInBounds(minLat, maxLat, minLon, maxLon, sinceHoursAgo = hours)
-                }
+                // Nueva lógica: obtener datos por tercio de octava o nivel global
+                val tiles = repository.getHeatmapData(bandIndex, minLat, maxLat, minLon, maxLon, hours)
                 
                 // Mapeo a modelo de vista con normalización de intensidad
                 val points = tiles.map { tile ->
                     HeatMapPoint(
                         geoPoint = GeoPoint(tile.lat, tile.lon),
-                        intensity = normalizeDb(tile.avgDb)
+                        intensity = normalizeDb(tile.avgDb, bandIndex == -1),
+                        rawDb = tile.avgDb
                     )
                 }
                 _heatmapPoints.value = points
@@ -122,13 +117,21 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Normaliza los valores de decibelios a un rango entre 0.0 y 1.0 para la representación visual.
+     * Ajustado para que las bandas de frecuencia (que tienen menos energía que el total) sean visibles.
      */
-    private fun normalizeDb(db: Double): Double {
-        return ((db - MIN_DB) / (MAX_DB - MIN_DB)).coerceIn(0.0, 1.0)
+    private fun normalizeDb(db: Double, isGlobal: Boolean): Double {
+        val min = if (isGlobal) MIN_DB else 0.0 // Las bandas pueden ser muy bajas
+        val max = if (isGlobal) MAX_DB else 80.0 // Una sola banda rara vez llega a 100dB
+        return ((db - min) / (max - min)).coerceIn(0.0, 1.0)
     }
 
     /**
      * Representación de un punto de intensidad sonora en el mapa.
      */
-    data class HeatMapPoint(val geoPoint: GeoPoint, val intensity: Double)
+    data class HeatMapPoint(val geoPoint: GeoPoint, val intensity: Double, val rawDb: Double)
+
+    /**
+     * Modelo simple para coordenadas geográficas.
+     */
+    data class GeoPoint(val latitude: Double, val longitude: Double)
 }

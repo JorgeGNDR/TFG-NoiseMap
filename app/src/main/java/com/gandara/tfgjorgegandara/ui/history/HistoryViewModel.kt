@@ -56,4 +56,16 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
             _selectedSampleDetails.value = FullSampleData(sample, bins, classifications)
         }
     }
+
+    /**
+     * Elimina una muestra de la base de datos.
+     */
+    fun deleteSample(sample: AudioSample) {
+        viewModelScope.launch {
+            db.audioSampleDao().deleteSample(sample)
+            if (_selectedSampleDetails.value?.sample?.id == sample.id) {
+                _selectedSampleDetails.value = null
+            }
+        }
+    }
 }

@@ -5,6 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -21,6 +23,7 @@ import java.util.*
 fun HistoryScreen(viewModel: HistoryViewModel) {
     val samples by viewModel.samples.collectAsState()
     val details by viewModel.selectedSampleDetails.collectAsState()
+    var sampleToDelete by remember { mutableStateOf<AudioSample?>(null) }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text(
@@ -36,10 +39,32 @@ fun HistoryScreen(viewModel: HistoryViewModel) {
                     sample = sample,
                     isSelected = details?.sample?.id == sample.id,
                     onClick = { viewModel.loadSampleDetails(sample) },
+                    onDelete = { sampleToDelete = sample },
                     details = if (details?.sample?.id == sample.id) details else null
                 )
             }
         }
+    }
+
+    if (sampleToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { sampleToDelete = null },
+            title = { Text("Eliminar muestra") },
+            text = { Text("¿Estás seguro de que deseas eliminar esta medición? Esta acción no se puede deshacer.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    sampleToDelete?.let { viewModel.deleteSample(it) }
+                    sampleToDelete = null
+                }) {
+                    Text("Eliminar", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { sampleToDelete = null }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 }
 
@@ -51,6 +76,7 @@ fun SampleItem(
     sample: AudioSample, 
     isSelected: Boolean, 
     onClick: () -> Unit,
+    onDelete: () -> Unit,
     details: FullSampleData?
 ) {
     val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
@@ -95,6 +121,17 @@ fun SampleItem(
                         if (d.bins.isNotEmpty()) {
                             Text("📊 Resolución espectral: ${d.bins.size} bandas registradas", style = MaterialTheme.typography.bodyMedium)
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = onDelete,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Borrar muestra")
                     }
                 }
             }

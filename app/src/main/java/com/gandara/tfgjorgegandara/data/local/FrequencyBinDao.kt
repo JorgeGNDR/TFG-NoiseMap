@@ -16,7 +16,7 @@ interface FrequencyBinDao {
 
     /**
      * Obtiene la energía promedio agrupada por zonas espaciales para una banda específica.
-     * Esto permite el filtrado por frecuencia en el mapa de calor.
+     * Incluye filtro temporal para consistencia con el nivel global.
      */
     @Query("""
         SELECT 
@@ -27,12 +27,14 @@ interface FrequencyBinDao {
         FROM audio_samples S
         JOIN frequency_bins F ON S.id = F.sampleId
         WHERE F.band = :targetBand
+        AND S.timestamp >= :sinceTimestamp
         AND S.latitude BETWEEN :minLat AND :maxLat
         AND S.longitude BETWEEN :minLon AND :maxLon
         GROUP BY tileId
     """)
     suspend fun getEnergyByTileAndBand(
         targetBand: Int,
+        sinceTimestamp: Long,
         minLat: Double,
         maxLat: Double,
         minLon: Double,

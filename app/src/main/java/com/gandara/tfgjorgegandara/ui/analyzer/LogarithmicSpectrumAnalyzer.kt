@@ -35,7 +35,7 @@ fun LogarithmicSpectrumAnalyzer(
     val peakLabelStyle = TextStyle(color = TextDark.copy(alpha = 0.8f), fontSize = 12.sp, fontWeight = FontWeight.Bold)
 
     val majorHz = listOf(62f, 125f, 250f, 500f, 1000f, 2000f, 4000f, 8000f, 16000f)
-    val majorDb = listOf(-20f, 0f, 20f, 40f, 60f, 80f, 100f, 120f)
+    val majorDb = listOf(-20f, 0f, 20f, 40f, 60f, 80f, 100f)
 
     Canvas(modifier = modifier.fillMaxSize()) {
         val width = size.width

@@ -75,17 +75,17 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
     private var currentPeakHold = FloatArray(0)
     private val DECAY_FACTOR = 0.98f
 
-    // Acumuladores para sesiones de captura de 5 segundos
+    // Acumuladores para sesiones de captura de 3 segundos
     private var isCaptureActive = false
     private var captureStartTime = 0L
-    private val CAPTURE_DURATION_MS = 5000L
+    private val CAPTURE_DURATION_MS = 3000L
     private var captureSpectrumSum: FloatArray? = null
     private var captureDbSum = 0.0
     private var captureCount = 0
     private var captureMaxDb = -100.0
-    private var energyLow = 0.0
-    private var energyMid = 0.0
-    private var energyHigh = 0.0
+    
+    // Almacén para YAMNet durante los 3 segundos
+    private val captureYAMNetLabels = mutableMapOf<String, Float>()
 
     init {
         val db = AppDatabase.getDatabase(application)
@@ -112,15 +112,24 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
                 WeightingType.Z -> results.z
             }
 
-            // Gestión de la clasificación por redes neuronales (YAMNet)
+            // Gestión de la clasificación por redes neuronales (YAMNet) - CAMINO A
             classificationCounter++
             if (classificationCounter >= CLASSIFICATION_INTERVAL) {
                 classificationCounter = 0
-                val bufferCopy = audioBuffer.clone()
                 viewModelScope.launch(Dispatchers.Default) {
-                    val floatBuffer = FloatArray(bufferCopy.size) { i -> bufferCopy[i] / 32768.0f }
-                    val resampled = resampleTo16kHz(floatBuffer)
-                    val label = classifierManager.classify(resampled)
+                    // Ahora classifyContinuous lee directamente de su propio buffer de 1s
+                    val label = classifierManager.classifyContinuous()
+                    
+                    if (isCaptureActive) {
+                        synchronized(captureYAMNetLabels) {
+                            val cleanLabel = label.substringBefore(" (")
+                            if (cleanLabel != "AMBIENTE" && cleanLabel != "Analizando...") {
+                                val currentProb = captureYAMNetLabels.getOrDefault(cleanLabel, 0f)
+                                captureYAMNetLabels[cleanLabel] = max(currentProb, 0.7f)
+                            }
+                        }
+                    }
+                    
                     _uiState.update { it.copy(detectedSound = label) }
                 }
             }
@@ -151,17 +160,8 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
             }
         }
 
-        // Clasificación energética por bandas básicas
-        val binSize = 44100.0 / 4096
-        spectrum.forEachIndexed { i, dbValue ->
-            val freq = i * binSize
-            val energy = 10.0.pow(dbValue / 10.0)
-            when {
-                freq < 250 -> energyLow += energy
-                freq < 4000 -> energyMid += energy
-                else -> energyHigh += energy
-            }
-        }
+        // No es necesaria la clasificación energética manual por bandas básicas aquí
+        // Ya que ahora calculamos tercios de octava completos al finalizar
     }
 
     /**
@@ -238,25 +238,62 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
      */
     private fun finalizeCapture(location: Location?) {
         isCaptureActive = false
-        val avgDb = captureDbSum / captureCount
+        val avgDb = if (captureCount > 0) captureDbSum / captureCount else 0.0
+        val finalSpectrum = captureSpectrumSum?.map { it / captureCount }?.toFloatArray() ?: FloatArray(0)
+        
+        // Calcular frecuencia dominante
+        var dominantFreq = 0f
+        if (finalSpectrum.isNotEmpty()) {
+            val maxIndex = finalSpectrum.indices.maxByOrNull { finalSpectrum[it] } ?: 0
+            dominantFreq = (maxIndex * 44100f / 4096f)
+        }
+
+        // Convertir espectro FFT a 1/3 Octava (Simplificado para el repositorio)
+        val thirdOctaveBands = calculateThirdOctaveBands(finalSpectrum)
 
         viewModelScope.launch(Dispatchers.IO) {
             val state = _uiState.value
-            val labels = if (state.detectedSound.isNotEmpty()) {
-                mapOf(state.detectedSound to 1.0f)
-            } else emptyMap()
+            val labels = synchronized(captureYAMNetLabels) { captureYAMNetLabels.toMap() }
 
             repository.saveCompleteAudioSample(
                 avgDb = avgDb.toFloat(),
                 peakDb = captureMaxDb.toFloat(),
                 location = location,
-                spectralEnergy = captureSpectrumSum ?: FloatArray(0),
+                spectralEnergy = thirdOctaveBands,
                 labels = labels,
+                dominantFreq = dominantFreq,
                 weighting = state.selectedWeighting.name
             )
         }
         
         _uiState.update { it.copy(isCapturing = false, captureProgress = 0f) }
+    }
+
+    /**
+     * Agrupa el espectro FFT en 31 bandas de tercio de octava.
+     */
+    private fun calculateThirdOctaveBands(fftSpectrum: FloatArray): FloatArray {
+        val bands = FloatArray(AudioRepository.THIRD_OCTAVE_FREQUENCIES.size)
+        val binSize = 44100.0 / 4096.0
+        
+        AudioRepository.THIRD_OCTAVE_FREQUENCIES.forEachIndexed { index, centerFreq ->
+            val lowerFreq = centerFreq / 1.122
+            val upperFreq = centerFreq * 1.122
+            
+            var energySum = 0.0
+            var count = 0
+            
+            fftSpectrum.forEachIndexed { bin, dbValue ->
+                val freq = bin * binSize
+                if (freq in lowerFreq..upperFreq) {
+                    energySum += 10.0.pow(dbValue / 10.0)
+                    count++
+                }
+            }
+            
+            bands[index] = if (count > 0) (10.0 * log10(energySum / count)).toFloat() else -20f
+        }
+        return bands
     }
 
     /**
@@ -276,8 +313,10 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
         captureDbSum = 0.0
         captureCount = 0
         captureMaxDb = -100.0
-        energyLow = 0.0; energyMid = 0.0; energyHigh = 0.0
         captureSpectrumSum = null
+        synchronized(captureYAMNetLabels) {
+            captureYAMNetLabels.clear()
+        }
     }
 
     fun setWeighting(type: WeightingType) {
