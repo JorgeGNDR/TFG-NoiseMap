@@ -41,7 +41,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         private const val MIN_DB = 30.0
-        private const val MAX_DB = 100.0
+        private const val MAX_DB = 90.0
     }
 
     init {

@@ -213,9 +213,17 @@ private fun setupHeatmapLayer(style: Style) {
         PropertyFactory.heatmapWeight(
             Expression.get("intensity")
         ),
-        // FIJAMOS la intensidad del mapa de calor a 1.
-        // Esto evita que al alejar el zoom o acumular puntos, los colores se "sumen" y cambien a rojo por densidad.
-        PropertyFactory.heatmapIntensity(1f),
+        // Ajustamos la intensidad dinámicamente según el zoom.
+        // Al alejar el zoom (niveles bajos), bajamos la intensidad para que la acumulación de puntos
+        // no sature el color hacia el rojo. Al acercarnos, subimos la intensidad.
+        PropertyFactory.heatmapIntensity(
+            Expression.interpolate(
+                Expression.linear(), Expression.zoom(),
+                Expression.stop(0, 0.05f),
+                Expression.stop(10, 0.3f),
+                Expression.stop(15, 1.0f)
+            )
+        ),
         
         // Radio de difusión que se ajusta con el zoom para que las manchas no se solapen demasiado
         PropertyFactory.heatmapRadius(
@@ -231,11 +239,11 @@ private fun setupHeatmapLayer(style: Style) {
             Expression.interpolate(
                 Expression.linear(), Expression.heatmapDensity(),
                 Expression.stop(0.0, Expression.color(Color.Transparent.toArgb())),
-                Expression.stop(0.1, Expression.color(Color(0xFF4CAF50).toArgb())), // Verde (~30-40 dB)
-                Expression.stop(0.3, Expression.color(Color(0xFF8BC34A).toArgb())), // Verde Lima
-                Expression.stop(0.5, Expression.color(Color(0xFFFBC02D).toArgb())), // Amarillo (~60 dB)
-                Expression.stop(0.7, Expression.color(Color(0xFFF57C00).toArgb())), // Naranja (~75 dB)
-                Expression.stop(1.0, Expression.color(Color(0xFFD32F2F).toArgb()))  // Rojo (90+ dB)
+                Expression.stop(0.1, Expression.color(Color(0xFF4CAF50).toArgb())), // Verde (~35 dB)
+                Expression.stop(0.4, Expression.color(Color(0xFFFBC02D).toArgb())), // Amarillo (~55 dB)
+                Expression.stop(0.6, Expression.color(Color(0xFFF57C00).toArgb())), // Naranja (~65 dB)
+                Expression.stop(0.8, Expression.color(Color(0xFFD32F2F).toArgb())), // Rojo (~80 dB)
+                Expression.stop(1.0, Expression.color(Color(0xFFB71C1C).toArgb()))  // Rojo Oscuro (90+ dB)
             )
         ),
         PropertyFactory.heatmapOpacity(0.8f)
