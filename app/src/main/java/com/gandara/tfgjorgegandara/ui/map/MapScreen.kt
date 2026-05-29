@@ -161,19 +161,21 @@ fun MapScreen(
             }
         }
 
-        // UI de Control (Slicer de 1/3 Octava)
-        Column(
+        // Controles inferiores del mapa: selector de frecuencia y centrado en ubicacion actual.
+        Row(
             modifier = Modifier
+                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(start = 16.dp, end = 24.dp, bottom = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Bottom
         ) {
             FrequencySlicerCard(
                 selectedIndex = selectedBandIndex,
-                onIndexChange = { mapViewModel.setFrequencyBandIndex(it) }
+                onIndexChange = { mapViewModel.setFrequencyBandIndex(it) },
+                modifier = Modifier.weight(1f)
             )
-        }
+        
 
         // Botón de centrado
         FloatingActionButton(
@@ -187,10 +189,10 @@ fun MapScreen(
                     )
                 }
             },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
             containerColor = MaterialTheme.colorScheme.primaryContainer
         ) {
             Icon(Icons.Default.LocationOn, contentDescription = null)
+        }
         }
 
         if (isLoading) {
@@ -252,10 +254,15 @@ private fun setupHeatmapLayer(style: Style) {
 }
 
 @Composable
-fun FrequencySlicerCard(selectedIndex: Int, onIndexChange: (Int) -> Unit) {
+fun FrequencySlicerCard(
+    selectedIndex: Int,
+    onIndexChange: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
     Card(
+        modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(8.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             val label = if (selectedIndex == -1) "Nivel Global (dB)" 

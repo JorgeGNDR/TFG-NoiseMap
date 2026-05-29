@@ -137,21 +137,16 @@ class AudioRepository(
         maxLon: Double,
         sinceHoursAgo: Int = 24
     ): List<TileWithCoords> {
-        val sinceBucket = TimeUnit.MILLISECONDS.toHours(System.currentTimeMillis()) - sinceHoursAgo
-        
-        val tiles = geoTileDao.getTilesInBounds(
-            sinceBucket,
-            (minLat * 10000).toInt(),
-            (maxLat * 10000).toInt(),
-            (minLon * 10000).toInt(),
-            (maxLon * 10000).toInt()
-        )
+        val sinceTimestamp = System.currentTimeMillis() - TimeUnit.HOURS.toMillis(sinceHoursAgo.toLong())
 
-        return tiles.map { tile ->
-            val parts = tile.tileId.split("_")
-            val lat = parts[0].toDouble() / 10000.0
-            val lon = parts[1].toDouble() / 10000.0
-            TileWithCoords(lat, lon, tile.avgDb)
+        return audioSampleDao.getAverageDbByLocationTile(
+            sinceTimestamp,
+            minLat,
+            maxLat,
+            minLon,
+            maxLon
+        ).map { tile ->
+            TileWithCoords(tile.lat, tile.lon, tile.avgDb)
         }
     }
 

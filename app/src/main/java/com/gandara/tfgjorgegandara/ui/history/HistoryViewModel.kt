@@ -3,6 +3,7 @@ package com.gandara.tfgjorgegandara.ui.history
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.gandara.tfgjorgegandara.ai.NoiseExplanationService
 import com.gandara.tfgjorgegandara.data.local.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,12 +24,19 @@ data class FullSampleData(
  */
 class HistoryViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getDatabase(application)
+    private val explanationService by lazy { NoiseExplanationService() }
     
     private val _samples = MutableStateFlow<List<AudioSample>>(emptyList())
     val samples: StateFlow<List<AudioSample>> = _samples.asStateFlow()
 
     private val _selectedSampleDetails = MutableStateFlow<FullSampleData?>(null)
     val selectedSampleDetails: StateFlow<FullSampleData?> = _selectedSampleDetails.asStateFlow()
+
+    private val _explainingSampleId = MutableStateFlow<Long?>(null)
+    val explainingSampleId: StateFlow<Long?> = _explainingSampleId.asStateFlow()
+
+    private val _explanationError = MutableStateFlow<String?>(null)
+    val explanationError: StateFlow<String?> = _explanationError.asStateFlow()
 
     init {
         loadSamples()
@@ -67,5 +75,45 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
                 _selectedSampleDetails.value = null
             }
         }
+    }
+
+    fun explainSample(sample: AudioSample) {
+        if (_explainingSampleId.value != null) return
+
+        viewModelScope.launch {
+            _explainingSampleId.value = sample.id
+            _explanationError.value = null
+
+            try {
+                val currentDetails = _selectedSampleDetails.value
+                val details = if (currentDetails?.sample?.id == sample.id) {
+                    currentDetails
+                } else {
+                    val bins = db.frequencyBinDao().getBinsForSample(sample.id)
+                    val classifications = db.soundClassificationDao().getClassificationsForSample(sample.id)
+                    FullSampleData(sample, bins, classifications)
+                }
+
+                val explanation = explanationService.explainSample(
+                    sample = details.sample,
+                    bins = details.bins,
+                    classifications = details.classifications
+                )
+
+                db.audioSampleDao().updateAiExplanation(sample.id, explanation)
+                _selectedSampleDetails.value = details.copy(
+                    sample = details.sample.copy(aiExplanation = explanation)
+                )
+            } catch (e: Exception) {
+                val reason = e.localizedMessage ?: e.javaClass.simpleName
+                _explanationError.value = "No se pudo generar la explicacion: $reason"
+            } finally {
+                _explainingSampleId.value = null
+            }
+        }
+    }
+
+    fun clearExplanationError() {
+        _explanationError.value = null
     }
 }

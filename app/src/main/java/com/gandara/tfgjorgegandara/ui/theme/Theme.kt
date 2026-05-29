@@ -24,7 +24,7 @@ private val DarkColorScheme = darkColorScheme(
 
 // Esquema de colores para el Modo Claro (El de tu Figma)
 private val LightColorScheme = lightColorScheme(
-    primary = RecordRed,
+    primary = PowerOrange,
     background = NeumorphicBackground, // El fondo gris de tu Figma
     surface = NeumorphicBackground,    // Tarjetas y barras de navegación
     onPrimary = NeumorphicBackground,  // Texto/Iconos sobre el color primario (Rojo)

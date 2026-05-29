@@ -19,5 +19,6 @@ data class AudioSample(
     val avgDb: Float,
     val peakDb: Float,
     val dominantFreq: Float = 0f,
-    val weighting: String // "A", "C" o "Z"
+    val weighting: String, // "A", "C" o "Z"
+    val aiExplanation: String? = null
 )

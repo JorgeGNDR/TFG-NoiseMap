@@ -40,8 +40,9 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     private var currentBounds: MapBounds? = null
 
     companion object {
-        private const val MIN_DB = 30.0
+        private const val MIN_DB = 20.0
         private const val MAX_DB = 90.0
+        private const val MIN_VISIBLE_INTENSITY = 0.18
     }
 
     init {
@@ -122,7 +123,8 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     private fun normalizeDb(db: Double, isGlobal: Boolean): Double {
         val min = if (isGlobal) MIN_DB else 0.0 // Las bandas pueden ser muy bajas
         val max = if (isGlobal) MAX_DB else 80.0 // Una sola banda rara vez llega a 100dB
-        return ((db - min) / (max - min)).coerceIn(0.0, 1.0)
+        val normalized = ((db - min) / (max - min)).coerceIn(0.0, 1.0)
+        return if (normalized > 0.0) normalized.coerceAtLeast(MIN_VISIBLE_INTENSITY) else MIN_VISIBLE_INTENSITY
     }
 
     /**

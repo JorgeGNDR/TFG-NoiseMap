@@ -33,6 +33,36 @@ interface AudioSampleDao {
     @Query("SELECT * FROM audio_samples ORDER BY timestamp DESC")
     fun getAllSamples(): Flow<List<AudioSample>>
 
+    @Query("""
+        SELECT
+            AVG(latitude) as lat,
+            AVG(longitude) as lon,
+            AVG(avgDb) as avgDb
+        FROM audio_samples
+        WHERE timestamp >= :sinceTimestamp
+        AND latitude != 0.0
+        AND longitude != 0.0
+        AND latitude BETWEEN :minLat AND :maxLat
+        AND longitude BETWEEN :minLon AND :maxLon
+        GROUP BY CAST(latitude * 10000 AS INTEGER), CAST(longitude * 10000 AS INTEGER)
+    """)
+    suspend fun getAverageDbByLocationTile(
+        sinceTimestamp: Long,
+        minLat: Double,
+        maxLat: Double,
+        minLon: Double,
+        maxLon: Double
+    ): List<TileDbResult>
+
+    @Query("UPDATE audio_samples SET aiExplanation = :explanation WHERE id = :sampleId")
+    suspend fun updateAiExplanation(sampleId: Long, explanation: String)
+
     @androidx.room.Delete
     suspend fun deleteSample(sample: AudioSample)
+
+    data class TileDbResult(
+        val lat: Double,
+        val lon: Double,
+        val avgDb: Double
+    )
 }

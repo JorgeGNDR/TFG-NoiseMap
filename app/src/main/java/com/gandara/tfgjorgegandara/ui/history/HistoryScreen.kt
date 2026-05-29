@@ -17,12 +17,14 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 /**
- * Pantalla de histórico que permite explorar las mediciones pasadas y sus metadatos detallados.
+ * Pantalla de historico que permite explorar las mediciones pasadas y sus metadatos detallados.
  */
 @Composable
 fun HistoryScreen(viewModel: HistoryViewModel) {
     val samples by viewModel.samples.collectAsState()
     val details by viewModel.selectedSampleDetails.collectAsState()
+    val explainingSampleId by viewModel.explainingSampleId.collectAsState()
+    val explanationError by viewModel.explanationError.collectAsState()
     var sampleToDelete by remember { mutableStateOf<AudioSample?>(null) }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -32,7 +34,7 @@ fun HistoryScreen(viewModel: HistoryViewModel) {
             color = MaterialTheme.colorScheme.primary
         )
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             items(samples) { sample ->
                 SampleItem(
@@ -40,6 +42,8 @@ fun HistoryScreen(viewModel: HistoryViewModel) {
                     isSelected = details?.sample?.id == sample.id,
                     onClick = { viewModel.loadSampleDetails(sample) },
                     onDelete = { sampleToDelete = sample },
+                    onExplain = { viewModel.explainSample(sample) },
+                    isExplaining = explainingSampleId == sample.id,
                     details = if (details?.sample?.id == sample.id) details else null
                 )
             }
@@ -50,7 +54,7 @@ fun HistoryScreen(viewModel: HistoryViewModel) {
         AlertDialog(
             onDismissRequest = { sampleToDelete = null },
             title = { Text("Eliminar muestra") },
-            text = { Text("¿Estás seguro de que deseas eliminar esta medición? Esta acción no se puede deshacer.") },
+            text = { Text("Estas seguro de que deseas eliminar esta medicion? Esta accion no se puede deshacer.") },
             confirmButton = {
                 TextButton(onClick = {
                     sampleToDelete?.let { viewModel.deleteSample(it) }
@@ -66,17 +70,32 @@ fun HistoryScreen(viewModel: HistoryViewModel) {
             }
         )
     }
+
+    explanationError?.let { message ->
+        AlertDialog(
+            onDismissRequest = { viewModel.clearExplanationError() },
+            title = { Text("Explicacion no disponible") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearExplanationError() }) {
+                    Text("Aceptar")
+                }
+            }
+        )
+    }
 }
 
 /**
- * Representación visual de una medición individual dentro del listado.
+ * Representacion visual de una medicion individual dentro del listado.
  */
 @Composable
 fun SampleItem(
-    sample: AudioSample, 
-    isSelected: Boolean, 
+    sample: AudioSample,
+    isSelected: Boolean,
     onClick: () -> Unit,
     onDelete: () -> Unit,
+    onExplain: () -> Unit,
+    isExplaining: Boolean,
     details: FullSampleData?
 ) {
     val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
@@ -97,29 +116,57 @@ fun SampleItem(
                 Text("ID: ${sample.id}", style = MaterialTheme.typography.labelLarge)
                 Text(dateString, style = MaterialTheme.typography.bodySmall)
             }
-            
+
             Text(
                 text = "Nivel: ${"%.1f".format(sample.avgDb)} dB (${sample.weighting})",
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Bold
             )
 
-            // Panel expansible con detalles adicionales (IA y Ubicación)
             AnimatedVisibility(visible = isSelected) {
                 Column(modifier = Modifier.padding(top = 8.dp)) {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                    Text("📍 Ubicación: ${sample.latitude}, ${sample.longitude}", style = MaterialTheme.typography.bodyMedium)
-                    Text("🚀 Nivel Pico: ${"%.1f".format(sample.peakDb)} dB", style = MaterialTheme.typography.bodyMedium)
-                    
-                    details?.let { d ->
-                        if (d.classifications.isNotEmpty()) {
-                            val classificationText = d.classifications.joinToString { 
-                                "${it.label} (${"%.0f".format(it.probability * 100)}%)" 
+                    Text("Ubicacion: ${sample.latitude}, ${sample.longitude}", style = MaterialTheme.typography.bodyMedium)
+                    Text("Nivel pico: ${"%.1f".format(sample.peakDb)} dB", style = MaterialTheme.typography.bodyMedium)
+
+                    details?.let { data ->
+                        if (data.classifications.isNotEmpty()) {
+                            val classificationText = data.classifications.joinToString {
+                                "${it.label} (${"%.0f".format(it.probability * 100)}%)"
                             }
-                            Text("🤖 IA: $classificationText", style = MaterialTheme.typography.bodyMedium)
+                            Text("IA: $classificationText", style = MaterialTheme.typography.bodyMedium)
                         }
-                        if (d.bins.isNotEmpty()) {
-                            Text("📊 Resolución espectral: ${d.bins.size} bandas registradas", style = MaterialTheme.typography.bodyMedium)
+                        if (data.bins.isNotEmpty()) {
+                            Text("Resolucion espectral: ${data.bins.size} bandas registradas", style = MaterialTheme.typography.bodyMedium)
+                        }
+
+                        val explanation = data.sample.aiExplanation
+                        if (!explanation.isNullOrBlank()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Explicacion IA",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(explanation, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = onExplain,
+                        enabled = !isExplaining,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (isExplaining) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Generando explicacion...")
+                        } else {
+                            Text(if (sample.aiExplanation.isNullOrBlank()) "Explicar muestra" else "Actualizar explicacion")
                         }
                     }
 

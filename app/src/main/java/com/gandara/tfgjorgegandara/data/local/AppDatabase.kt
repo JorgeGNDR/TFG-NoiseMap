@@ -2,8 +2,10 @@ package com.gandara.tfgjorgegandara.data.local
 
 import android.content.Context
 import androidx.room.Database
+import androidx.room.migration.Migration
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [
@@ -12,7 +14,7 @@ import androidx.room.RoomDatabase
         FrequencyBin::class, 
         SoundClassification::class
     ], 
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -33,10 +35,17 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "noise_map_database"
                 )
+                .addMigrations(MIGRATION_5_6)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance
                 instance
+            }
+        }
+
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE audio_samples ADD COLUMN aiExplanation TEXT")
             }
         }
     }

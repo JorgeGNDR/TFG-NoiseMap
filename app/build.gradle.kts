@@ -1,8 +1,37 @@
+import groovy.json.JsonSlurper
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("com.google.devtools.ksp") version "2.1.10-1.0.29"
+}
+
+fun firebaseConfigValues(): Map<String, String> {
+    val googleServicesFile = file("google-services.json")
+    if (!googleServicesFile.exists()) return emptyMap()
+
+    val json = JsonSlurper().parse(googleServicesFile) as Map<*, *>
+    val projectInfo = json["project_info"] as Map<*, *>
+    val clients = json["client"] as List<*>
+    val client = clients
+        .map { it as Map<*, *> }
+        .firstOrNull {
+            val clientInfo = it["client_info"] as? Map<*, *>
+            val androidClientInfo = clientInfo?.get("android_client_info") as? Map<*, *>
+            androidClientInfo?.get("package_name") == "com.gandara.tfgjorgegandara"
+        } ?: clients.first() as Map<*, *>
+
+    val clientInfo = client["client_info"] as Map<*, *>
+    val apiKey = (client["api_key"] as List<*>).first() as Map<*, *>
+
+    return mapOf(
+        "google_app_id" to clientInfo["mobilesdk_app_id"].toString(),
+        "google_api_key" to apiKey["current_key"].toString(),
+        "project_id" to projectInfo["project_id"].toString(),
+        "gcm_defaultSenderId" to projectInfo["project_number"].toString(),
+        "google_storage_bucket" to projectInfo["storage_bucket"].toString()
+    )
 }
 
 android {
@@ -19,6 +48,10 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        firebaseConfigValues().forEach { (name, value) ->
+            resValue("string", name, value)
+        }
     }
 
     buildTypes {
@@ -73,8 +106,9 @@ dependencies {
     // MapLibre (Mapas vectoriales y heatmap profesional)
     implementation("org.maplibre.gl:android-sdk:13.1.0")
 
-    // implementar api gemini
-    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
+    // Firebase AI Logic (Gemini Developer API)
+    implementation(platform("com.google.firebase:firebase-bom:34.10.0"))
+    implementation("com.google.firebase:firebase-ai")
 
     // YAMNNET (TFLite)
     implementation(libs.tensorflow.lite)

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "528174648639",
+    "project_id": "noisemap-ef3ef",
+    "storage_bucket": "noisemap-ef3ef.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:528174648639:android:69f25f307d823b9acd578a",
+        "android_client_info": {
+          "package_name": "com.gandara.tfgjorgegandara"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDfSJ6ugKKWx5pto5mWGdpqnT6dNgIjDS4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
