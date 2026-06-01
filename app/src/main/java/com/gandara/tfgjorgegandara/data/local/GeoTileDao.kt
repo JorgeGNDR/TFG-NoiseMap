@@ -1,19 +1,41 @@
 package com.gandara.tfgjorgegandara.data.local
 
 import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 
 @Dao
-interface GeoTileDao {
+abstract class GeoTileDao {
+
+    @Transaction
+    open suspend fun upsertSampleToTile(tileId: String, timeBucket: Long, dbValue: Double) {
+        val insertedId = insertTile(
+            GeoTile(
+                tileId = tileId,
+                timeBucket = timeBucket,
+                avgDb = dbValue,
+                peakDb = dbValue,
+                sampleCount = 1
+            )
+        )
+
+        if (insertedId == -1L) {
+            updateTileStats(tileId, timeBucket, dbValue)
+        }
+    }
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    abstract suspend fun insertTile(tile: GeoTile): Long
 
     @Query("""
-        INSERT INTO geo_tiles (tileId, timeBucket, avgDb, peakDb, sampleCount)
-        VALUES (:tileId, :timeBucket, :dbValue, :dbValue, 1)
-        ON CONFLICT(tileId, timeBucket) DO UPDATE SET
-            avgDb = (avgDb * sampleCount + EXCLUDED.avgDb) / (sampleCount + 1),
-            peakDb = MAX(peakDb, EXCLUDED.peakDb),
+        UPDATE geo_tiles SET
+            avgDb = (avgDb * sampleCount + :dbValue) / (sampleCount + 1),
+            peakDb = MAX(peakDb, :dbValue),
             sampleCount = sampleCount + 1
+        WHERE tileId = :tileId AND timeBucket = :timeBucket
     """)
-    suspend fun upsertSampleToTile(tileId: String, timeBucket: Long, dbValue: Double)
+    abstract suspend fun updateTileStats(tileId: String, timeBucket: Long, dbValue: Double)
 
 }
