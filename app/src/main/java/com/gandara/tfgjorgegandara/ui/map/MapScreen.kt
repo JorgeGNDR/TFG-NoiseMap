@@ -25,7 +25,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.gandara.tfgjorgegandara.domain.repository.AudioRepository
+import com.gandara.tfgjorgegandara.domain.model.ThirdOctaveBands
 import com.gandara.tfgjorgegandara.ui.common.LocationViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -351,7 +351,7 @@ private fun frequencyLabel(selectedIndex: Int): String {
     return if (selectedIndex == -1) {
         "Nivel Global"
     } else {
-        "${AudioRepository.THIRD_OCTAVE_FREQUENCIES[selectedIndex].toInt()} Hz"
+        "${ThirdOctaveBands.CENTER_FREQUENCIES_HZ[selectedIndex].toInt()} Hz"
     }
 }
 

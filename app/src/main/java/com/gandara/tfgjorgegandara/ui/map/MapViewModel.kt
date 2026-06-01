@@ -3,7 +3,7 @@ package com.gandara.tfgjorgegandara.ui.map
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.gandara.tfgjorgegandara.data.local.AppDatabase
+import com.gandara.tfgjorgegandara.data.repository.RepositoryProvider
 import com.gandara.tfgjorgegandara.domain.repository.AudioRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,13 +46,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
-        val db = AppDatabase.getDatabase(application)
-        repository = AudioRepository(
-            db.audioSampleDao(),
-            db.geoTileDao(),
-            db.frequencyBinDao(),
-            db.soundClassificationDao()
-        )
+        repository = RepositoryProvider.audioRepository(application)
     }
 
     /**

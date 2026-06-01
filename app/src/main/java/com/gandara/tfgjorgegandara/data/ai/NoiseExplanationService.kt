@@ -1,9 +1,9 @@
-package com.gandara.tfgjorgegandara.ai
+package com.gandara.tfgjorgegandara.data.ai
 
 import com.gandara.tfgjorgegandara.data.local.AudioSample
 import com.gandara.tfgjorgegandara.data.local.FrequencyBin
 import com.gandara.tfgjorgegandara.data.local.SoundClassification
-import com.gandara.tfgjorgegandara.domain.repository.AudioRepository
+import com.gandara.tfgjorgegandara.domain.model.ThirdOctaveBands
 import com.google.firebase.Firebase
 import com.google.firebase.ai.ai
 import com.google.firebase.ai.type.GenerativeBackend
@@ -69,7 +69,7 @@ class NoiseExplanationService {
             .sortedByDescending { it.energy }
             .take(5)
             .joinToString { bin ->
-                val frequency = AudioRepository.THIRD_OCTAVE_FREQUENCIES.getOrNull(bin.band)
+                val frequency = ThirdOctaveBands.CENTER_FREQUENCIES_HZ.getOrNull(bin.band)
                 if (frequency != null) {
                     "${frequency.toInt()} Hz (${bin.energy.toInt()} dB)"
                 } else {

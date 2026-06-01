@@ -3,7 +3,7 @@ package com.gandara.tfgjorgegandara.ui.history
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.gandara.tfgjorgegandara.ai.NoiseExplanationService
+import com.gandara.tfgjorgegandara.data.ai.NoiseExplanationService
 import com.gandara.tfgjorgegandara.data.local.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

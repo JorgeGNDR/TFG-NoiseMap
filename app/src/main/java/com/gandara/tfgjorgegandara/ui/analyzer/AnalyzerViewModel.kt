@@ -5,7 +5,8 @@ import android.location.Location
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.gandara.tfgjorgegandara.data.local.AppDatabase
+import com.gandara.tfgjorgegandara.data.repository.RepositoryProvider
+import com.gandara.tfgjorgegandara.domain.model.ThirdOctaveBands
 import com.gandara.tfgjorgegandara.domain.repository.AudioRepository
 import com.gandara.tfgjorgegandara.dsp.AudioCaptureManager
 import com.gandara.tfgjorgegandara.dsp.FFTCalculator
@@ -96,13 +97,7 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
         fftCalculator = FFTCalculator(currentBufferSize)
         _uiState.update { it.copy(offset = AppSettings.state.value.calibrationOffset) }
 
-        val db = AppDatabase.getDatabase(application)
-        repository = AudioRepository(
-            db.audioSampleDao(), 
-            db.geoTileDao(), 
-            db.frequencyBinDao(),
-            db.soundClassificationDao()
-        )
+        repository = RepositoryProvider.audioRepository(application)
         
         classifierManager.start()
         startAnalyzing()
@@ -286,7 +281,8 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
             repository.saveCompleteAudioSample(
                 avgDb = avgDb.toFloat(),
                 peakDb = captureMaxDb.toFloat(),
-                location = location,
+                latitude = location?.latitude,
+                longitude = location?.longitude,
                 spectralEnergy = thirdOctaveBands,
                 labels = labels,
                 dominantFreq = dominantFreq,
@@ -301,10 +297,10 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
      * Agrupa el espectro FFT en 31 bandas de tercio de octava.
      */
     private fun calculateThirdOctaveBands(fftSpectrum: FloatArray): FloatArray {
-        val bands = FloatArray(AudioRepository.THIRD_OCTAVE_FREQUENCIES.size)
+        val bands = FloatArray(ThirdOctaveBands.CENTER_FREQUENCIES_HZ.size)
         val binSize = 44100.0 / currentBufferSize.toDouble()
         
-        AudioRepository.THIRD_OCTAVE_FREQUENCIES.forEachIndexed { index, centerFreq ->
+        ThirdOctaveBands.CENTER_FREQUENCIES_HZ.forEachIndexed { index, centerFreq ->
             val lowerFreq = centerFreq / 1.122
             val upperFreq = centerFreq * 1.122
             
