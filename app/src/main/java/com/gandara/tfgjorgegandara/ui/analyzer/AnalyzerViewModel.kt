@@ -10,6 +10,7 @@ import com.gandara.tfgjorgegandara.domain.repository.AudioRepository
 import com.gandara.tfgjorgegandara.dsp.AudioCaptureManager
 import com.gandara.tfgjorgegandara.dsp.FFTCalculator
 import com.gandara.tfgjorgegandara.ml.SoundClassifierManager
+import com.gandara.tfgjorgegandara.settings.AppSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -54,8 +55,9 @@ data class AnalyzerState(
  * ViewModel que gestiona la lógica de procesamiento digital de señales (DSP) e inteligencia artificial.
  */
 class AnalyzerViewModel(application: Application) : AndroidViewModel(application) {
-    private val audioManager = AudioCaptureManager()
-    private val fftCalculator = FFTCalculator(4096)
+    private var currentBufferSize = AppSettings.state.value.spectrumBufferSize
+    private var audioManager = AudioCaptureManager(currentBufferSize)
+    private var fftCalculator = FFTCalculator(currentBufferSize)
     private val classifierManager = SoundClassifierManager(application)
     
     private val repository: AudioRepository
@@ -73,7 +75,7 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
     private var dbCount = 0
     private var internalPeak = 0.0
     private var currentPeakHold = FloatArray(0)
-    private val DECAY_FACTOR = 0.98f
+    private val PEAK_DECAY_DB = 0.6f
 
     // Acumuladores para sesiones de captura de 3 segundos
     private var isCaptureActive = false
@@ -88,6 +90,12 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
     private val captureYAMNetLabels = mutableMapOf<String, Float>()
 
     init {
+        AppSettings.init(application)
+        currentBufferSize = AppSettings.state.value.spectrumBufferSize
+        audioManager = AudioCaptureManager(currentBufferSize)
+        fftCalculator = FFTCalculator(currentBufferSize)
+        _uiState.update { it.copy(offset = AppSettings.state.value.calibrationOffset) }
+
         val db = AppDatabase.getDatabase(application)
         repository = AudioRepository(
             db.audioSampleDao(), 
@@ -98,6 +106,26 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
         
         classifierManager.start()
         startAnalyzing()
+
+        viewModelScope.launch {
+            AppSettings.state.collect { settings ->
+                applyAnalyzerSettings(settings.spectrumBufferSize, settings.calibrationOffset)
+            }
+        }
+    }
+
+    private fun applyAnalyzerSettings(bufferSize: Int, offset: Float) {
+        val bufferChanged = bufferSize != currentBufferSize
+        _uiState.update { it.copy(offset = offset) }
+
+        if (bufferChanged) {
+            currentBufferSize = bufferSize
+            audioManager.stopRecording()
+            audioManager = AudioCaptureManager(currentBufferSize)
+            fftCalculator = FFTCalculator(currentBufferSize)
+            currentPeakHold = FloatArray(0)
+            startAnalyzing()
+        }
     }
 
     /**
@@ -168,7 +196,7 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
      * Actualiza el estado de la UI con los valores calculados de intensidad y espectro.
      */
     private fun updateVisuals(currentDb: Double, results: FFTCalculator.WeightedResults) {
-        val binSize = 44100.0 / 4096
+        val binSize = 44100.0 / currentBufferSize
         val weightedSpectrum = results.spectrum.clone()
 
         // Aplicación de ponderación al espectro visual si no es Z (lineal)
@@ -187,7 +215,7 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
         if (currentPeakHold.size != weightedSpectrum.size) currentPeakHold = weightedSpectrum.clone()
         else {
             for (i in weightedSpectrum.indices) {
-                currentPeakHold[i] = max(weightedSpectrum[i], currentPeakHold[i] * DECAY_FACTOR)
+                currentPeakHold[i] = max(weightedSpectrum[i], currentPeakHold[i] - PEAK_DECAY_DB)
                 if (currentPeakHold[i] < -20f) currentPeakHold[i] = -20f
             }
         }
@@ -245,7 +273,7 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
         var dominantFreq = 0f
         if (finalSpectrum.isNotEmpty()) {
             val maxIndex = finalSpectrum.indices.maxByOrNull { finalSpectrum[it] } ?: 0
-            dominantFreq = (maxIndex * 44100f / 4096f)
+            dominantFreq = (maxIndex * 44100f / currentBufferSize)
         }
 
         // Convertir espectro FFT a 1/3 Octava (Simplificado para el repositorio)
@@ -274,7 +302,7 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
      */
     private fun calculateThirdOctaveBands(fftSpectrum: FloatArray): FloatArray {
         val bands = FloatArray(AudioRepository.THIRD_OCTAVE_FREQUENCIES.size)
-        val binSize = 44100.0 / 4096.0
+        val binSize = 44100.0 / currentBufferSize.toDouble()
         
         AudioRepository.THIRD_OCTAVE_FREQUENCIES.forEachIndexed { index, centerFreq ->
             val lowerFreq = centerFreq / 1.122

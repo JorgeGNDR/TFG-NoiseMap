@@ -8,35 +8,65 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
-// Esquema de colores para el Modo Oscuro (Opcional, pero buena práctica)
-// Para el Neumorfismo puro, a veces se usa el mismo gris, o se crea un gris más oscuro.
-// Por ahora, aplicamos tus colores base.
 private val DarkColorScheme = darkColorScheme(
-    primary = RecordRed,
+    primary = PowerOrange,
+    onPrimary = DeepBlack,
+    primaryContainer = Color(0xFFFFD8C8),
+    onPrimaryContainer = DeepBlack,
+    secondary = SoftPanel,
+    onSecondary = DeepBlack,
+    secondaryContainer = InkBlack,
+    onSecondaryContainer = WarmWhite,
+    tertiary = WarmWhite,
+    onTertiary = DeepBlack,
     background = NeumorphicBackground,
-    surface = NeumorphicBackground,
-    onPrimary = NeumorphicBackground,
     onBackground = TextDark,
-    onSurface = TextDark
+    surface = NeumorphicBackground,
+    onSurface = TextDark,
+    surfaceVariant = SoftPanel,
+    onSurfaceVariant = TextDark,
+    outline = TextGray,
+    outlineVariant = Color(0xFFC8CFCD),
+    error = PowerOrange,
+    onError = DeepBlack,
+    errorContainer = PowerOrange,
+    onErrorContainer = DeepBlack
 )
 
-// Esquema de colores para el Modo Claro (El de tu Figma)
 private val LightColorScheme = lightColorScheme(
     primary = PowerOrange,
-    background = NeumorphicBackground, // El fondo gris de tu Figma
-    surface = NeumorphicBackground,    // Tarjetas y barras de navegación
-    onPrimary = NeumorphicBackground,  // Texto/Iconos sobre el color primario (Rojo)
-    onBackground = TextDark,           // Texto principal sobre el fondo
-    onSurface = TextDark               // Texto sobre tarjetas/barras
+    onPrimary = DeepBlack,
+    primaryContainer = Color(0xFFFFD8C8),
+    onPrimaryContainer = DeepBlack,
+    secondary = InkBlack,
+    onSecondary = WarmWhite,
+    secondaryContainer = SoftPanel,
+    onSecondaryContainer = DeepBlack,
+    tertiary = SoftPanel,
+    onTertiary = DeepBlack,
+    background = NeumorphicBackground,
+    onBackground = TextDark,
+    surface = NeumorphicBackground,
+    onSurface = TextDark,
+    surfaceVariant = SoftPanel,
+    onSurfaceVariant = TextDark,
+    outline = TextGray,
+    outlineVariant = Color(0xFFC8CFCD),
+    inverseSurface = DeepBlack,
+    inverseOnSurface = WarmWhite,
+    inversePrimary = PowerOrange,
+    error = PowerOrange,
+    onError = DeepBlack,
+    errorContainer = PowerOrange,
+    onErrorContainer = DeepBlack
 )
 
 @Composable
 fun NoiseMapTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // IMPORTANTE: Ponemos dynamicColor a FALSE por defecto para que Android 12+
-    // no nos cambie el fondo y rompa el efecto Neumórfico.
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
@@ -51,7 +81,7 @@ fun NoiseMapTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography, // Asegúrate de que Type.kt existe y no tiene errores
+        typography = Typography,
         content = content
     )
 }

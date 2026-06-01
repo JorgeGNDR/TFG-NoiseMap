@@ -14,14 +14,13 @@ import kotlin.math.sqrt
  * Gestor de la captura de audio crudo desde el hardware del dispositivo.
  * Se encarga de la configuración del buffer y la ejecución del hilo de lectura.
  */
-class AudioCaptureManager {
+class AudioCaptureManager(private val fftSize: Int = 4096) {
     private val sampleRate = 44100
     private val channelConfig = AudioFormat.CHANNEL_IN_MONO
     private val audioFormat = AudioFormat.ENCODING_PCM_16BIT
-    private val FFT_SIZE = 4096
 
     private val minHardwareBuffer = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
-    private val safeBufferSizeInBytes = max(minHardwareBuffer, FFT_SIZE * 2)
+    private val safeBufferSizeInBytes = max(minHardwareBuffer, fftSize * 2)
 
     private var audioRecord: AudioRecord? = null
     private var isRecording = false
@@ -52,7 +51,7 @@ class AudioCaptureManager {
                 return
             }
 
-            val dataBuffer = ShortArray(FFT_SIZE)
+            val dataBuffer = ShortArray(fftSize)
             audioRecord?.startRecording()
             isRecording = true
 

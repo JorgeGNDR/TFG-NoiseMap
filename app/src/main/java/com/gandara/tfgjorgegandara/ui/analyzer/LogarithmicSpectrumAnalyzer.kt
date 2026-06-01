@@ -107,7 +107,7 @@ fun LogarithmicSpectrumAnalyzer(
 
         // 4. Dibujar Curva de Picos (Peak Hold)
         createPath(peakHoldDB)?.let {
-            drawPath(path = it, color = LightBlue.copy(alpha = 0.3f), style = Stroke(width = 1.dp.toPx()))
+            drawPath(path = it, color = PeakHoldBlue.copy(alpha = 0.65f), style = Stroke(width = 1.2.dp.toPx()))
         }
 
         // 5. Dibujar Curva Tiempo Real y Seguimiento de Pico Texto

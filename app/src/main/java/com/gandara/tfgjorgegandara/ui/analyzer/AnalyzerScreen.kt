@@ -6,12 +6,17 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,6 +43,7 @@ fun AnalyzerScreen(
     val state by viewModel.uiState.collectAsState()
     val currentLocation by locationViewModel.currentLocation.collectAsState()
     val interactionSource = remember { MutableInteractionSource() }
+    var showWeightingInfo by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -87,26 +93,48 @@ fun AnalyzerScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
-                modifier = Modifier
-                    .height(44.dp)
-                    .neumorphic(cornerRadius = 22.dp)
-                    .background(NeumorphicBackground, shape = RoundedCornerShape(22.dp))
-                    .padding(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                WeightingType.values().forEach { type ->
-                    val isSelected = state.selectedWeighting == type
-                    Box(
-                        modifier = Modifier
-                            .width(55.dp)
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(if (isSelected) RecordRed.copy(alpha = 0.1f) else Color.Transparent)
-                            .clickable { viewModel.setWeighting(type) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(text = type.name, color = if (isSelected) RecordRed else TextGray, fontSize = 13.sp)
+                Row(
+                    modifier = Modifier
+                        .height(44.dp)
+                        .neumorphic(cornerRadius = 22.dp)
+                        .background(NeumorphicBackground, shape = RoundedCornerShape(22.dp))
+                        .padding(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    WeightingType.values().forEach { type ->
+                        val isSelected = state.selectedWeighting == type
+                        Box(
+                            modifier = Modifier
+                                .width(55.dp)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(if (isSelected) PowerOrange.copy(alpha = 0.1f) else Color.Transparent)
+                                .clickable { viewModel.setWeighting(type) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text = type.name, color = if (isSelected) PowerOrange else TextGray, fontSize = 13.sp)
+                        }
                     }
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .neumorphic(cornerRadius = 18.dp)
+                        .background(NeumorphicBackground, shape = CircleShape)
+                        .clickable { showWeightingInfo = true },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "?",
+                        color = TextDark,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
 
@@ -123,7 +151,7 @@ fun AnalyzerScreen(
                         id = if (state.isPaused) R.drawable.play_arrow_24px else R.drawable.pause_24px
                     ),
                     contentDescription = "Control de pausa",
-                    tint = if (state.isPaused) RecordRed else TextDark,
+                    tint = if (state.isPaused) PowerOrange else TextDark,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -168,7 +196,7 @@ fun AnalyzerScreen(
                     text = statusText,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (state.isCapturing) RecordRed else TextDark
+                    color = if (state.isCapturing) PowerOrange else TextDark
                 )
             }
         }
@@ -188,10 +216,55 @@ fun AnalyzerScreen(
                 modifier = Modifier
                     .size(if (state.isCapturing) 30.dp else 45.dp)
                     .clip(if (state.isCapturing) RoundedCornerShape(6.dp) else CircleShape)
-                    .background(if (state.isCapturing) TextGray else RecordRed)
+                    .background(if (state.isCapturing) TextGray else PowerOrange)
             )
         }
         
         Spacer(modifier = Modifier.height(16.dp))
+    }
+
+    if (showWeightingInfo) {
+        WeightingInfoDialog(onDismiss = { showWeightingInfo = false })
+    }
+}
+
+@Composable
+private fun WeightingInfoDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Ponderaciones acusticas") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                WeightingInfoLine(
+                    title = "A",
+                    body = "Aproxima como percibe el oido humano. Reduce mucho graves y agudos extremos. Es la mas habitual para ruido ambiental."
+                )
+                WeightingInfoLine(
+                    title = "C",
+                    body = "Mantiene mas peso en bajas frecuencias. Es util para sonidos fuertes, graves o impactos."
+                )
+                WeightingInfoLine(
+                    title = "Z",
+                    body = "No aplica correccion perceptiva. Muestra la energia de la señal de forma mas plana y tecnica."
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Entendido")
+            }
+        }
+    )
+}
+
+@Composable
+private fun WeightingInfoLine(title: String, body: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = "Ponderacion $title",
+            color = PowerOrange,
+            fontWeight = FontWeight.Bold
+        )
+        Text(text = body, style = MaterialTheme.typography.bodyMedium)
     }
 }

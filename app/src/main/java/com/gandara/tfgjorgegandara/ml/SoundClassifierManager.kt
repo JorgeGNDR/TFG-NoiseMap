@@ -85,10 +85,10 @@ class SoundClassifierManager(context: Context) {
             if (topCategory != null && topCategory.score > 0.3f) {
                 "${topCategory.label} (${(topCategory.score * 100).toInt()}%)"
             } else {
-                "NULL"
+                "Analizando..."
             }
         } catch (e: Exception) {
-            "Analizando..."
+            "Error al leer datos del micrófono. Comprueba permisos"
         }
     }
 
