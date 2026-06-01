@@ -1,5 +1,8 @@
 package com.gandara.tfgjorgegandara.ui.map
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +21,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -109,14 +113,16 @@ fun MapScreen(
                         map.setStyle(Style.Builder().fromUri("https://api.maptiler.com/maps/dataviz-v4/style.json?key=u1kPuvsJUJUIxnU1Ost0")) { style ->
                             setupHeatmapLayer(style)
 
-                            map.locationComponent.apply {
-                                activateLocationComponent(
-                                    org.maplibre.android.location.LocationComponentActivationOptions
-                                        .builder(context, style)
-                                        .build()
-                                )
-                                isLocationComponentEnabled = true
-                                renderMode = org.maplibre.android.location.modes.RenderMode.COMPASS
+                            if (context.hasLocationPermission()) {
+                                map.locationComponent.apply {
+                                    activateLocationComponent(
+                                        org.maplibre.android.location.LocationComponentActivationOptions
+                                            .builder(context, style)
+                                            .build()
+                                    )
+                                    isLocationComponentEnabled = true
+                                    renderMode = org.maplibre.android.location.modes.RenderMode.COMPASS
+                                }
                             }
 
                             map.addOnCameraIdleListener {
@@ -347,4 +353,17 @@ private fun frequencyLabel(selectedIndex: Int): String {
     } else {
         "${AudioRepository.THIRD_OCTAVE_FREQUENCIES[selectedIndex].toInt()} Hz"
     }
+}
+
+private fun Context.hasLocationPermission(): Boolean {
+    val fineLocationGranted = ContextCompat.checkSelfPermission(
+        this,
+        Manifest.permission.ACCESS_FINE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+    val coarseLocationGranted = ContextCompat.checkSelfPermission(
+        this,
+        Manifest.permission.ACCESS_COARSE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+
+    return fineLocationGranted || coarseLocationGranted
 }
