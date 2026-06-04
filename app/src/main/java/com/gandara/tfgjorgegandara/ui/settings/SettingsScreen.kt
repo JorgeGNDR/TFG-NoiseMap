@@ -12,7 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.gandara.tfgjorgegandara.settings.AppSettings
+import com.gandara.tfgjorgegandara.data.settings.AppSettings
 import kotlin.math.roundToInt
 
 @Composable

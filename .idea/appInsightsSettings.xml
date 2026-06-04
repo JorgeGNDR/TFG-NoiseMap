@@ -6,14 +6,6 @@
         <entry key="Firebase Crashlytics">
           <value>
             <InsightsFilterSettings>
-              <option name="connection">
-                <ConnectionSetting>
-                  <option name="appId" value="com.gandara.tfgjorgegandara" />
-                  <option name="mobileSdkAppId" value="1:528174648639:android:69f25f307d823b9acd578a" />
-                  <option name="projectId" value="noisemap-ef3ef" />
-                  <option name="projectNumber" value="528174648639" />
-                </ConnectionSetting>
-              </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />
               <option name="timeIntervalDays" value="THIRTY_DAYS" />
               <option name="visibilityType" value="ALL" />

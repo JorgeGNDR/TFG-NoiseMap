@@ -25,9 +25,9 @@ private const val RANGE_DB = MAX_DB - MIN_DB
 
 @Composable
 fun LogarithmicSpectrumAnalyzer(
+    modifier: Modifier = Modifier,
     amplitudesDB : FloatArray,
     peakHoldDB: FloatArray = FloatArray(0),
-    modifier: Modifier = Modifier,
     sampleRate: Float = 44100f
 ) {
     val textMeasurer = rememberTextMeasurer()
@@ -49,7 +49,7 @@ fun LogarithmicSpectrumAnalyzer(
 
         val majorGridColor = TextDark.copy(alpha = 0.12f)
 
-        // 1. Ejes Hz
+        // Ejes Hz
         majorHz.forEach { freq ->
             val x = chartLeft + ((log10(freq) - MIN_FREQ_LOG) / (MAX_FREQ_LOG - MIN_FREQ_LOG)) * chartWidth
             drawLine(color = majorGridColor, start = Offset(x, chartTop), end = Offset(x, chartTop + chartHeight))
@@ -63,7 +63,7 @@ fun LogarithmicSpectrumAnalyzer(
             )
         }
 
-        // 2. Ejes dB
+        // Ejes dB
         majorDb.forEach { db ->
             val y = chartTop + chartHeight - (((db - MIN_DB) / RANGE_DB) * chartHeight)
             drawLine(color = majorGridColor, start = Offset(chartLeft, y), end = Offset(chartLeft + chartWidth, y))
@@ -78,7 +78,7 @@ fun LogarithmicSpectrumAnalyzer(
             )
         }
 
-        // 3. Función auxiliar para crear Path
+        // Función genérica para crear Path
         fun createPath(data: FloatArray): Path? {
             if (data.isEmpty()) return null
             val path = Path()
@@ -105,18 +105,19 @@ fun LogarithmicSpectrumAnalyzer(
             return if (started) path else null
         }
 
-        // 4. Dibujar Curva de Picos (Peak Hold)
+        // Usamos createPath para pintar la curva lenta de picos
         createPath(peakHoldDB)?.let {
             drawPath(path = it, color = PeakHoldBlue.copy(alpha = 0.65f), style = Stroke(width = 1.2.dp.toPx()))
         }
 
-        // 5. Dibujar Curva Tiempo Real y Seguimiento de Pico Texto
+        // Usamos createPath para pintar la curva en tiempo real, buscamos la frecuencia más alta y dibujamos el texto en su pico
         createPath(amplitudesDB)?.let {
             drawPath(path = it, color = PowerOrange, style = Stroke(width = 1.5.dp.toPx(), join = StrokeJoin.Round))
             
             var maxDb = -100f
             var maxFreq = 0f
             val binSize = sampleRate / (amplitudesDB.size * 2)
+            // Buscamos la frecuencia más fuerte (dB)
             for (i in 1 until amplitudesDB.size) {
                 if (amplitudesDB[i] > maxDb) { maxDb = amplitudesDB[i]; maxFreq = i * binSize }
             }

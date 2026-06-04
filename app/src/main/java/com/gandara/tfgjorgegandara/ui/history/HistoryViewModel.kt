@@ -3,34 +3,28 @@ package com.gandara.tfgjorgegandara.ui.history
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.gandara.tfgjorgegandara.data.ai.NoiseExplanationService
-import com.gandara.tfgjorgegandara.data.local.*
+import com.gandara.tfgjorgegandara.data.repository.RepositoryProvider
+import com.gandara.tfgjorgegandara.domain.model.AudioSampleRecord
+import com.gandara.tfgjorgegandara.domain.model.FullAudioSample
+import com.gandara.tfgjorgegandara.domain.repository.HistoryRepository
+import com.gandara.tfgjorgegandara.domain.repository.NoiseExplanationRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * Agregador de datos que representa una muestra de audio con todos sus detalles asociados.
- */
-data class FullSampleData(
-    val sample: AudioSample,
-    val bins: List<FrequencyBin>,
-    val classifications: List<SoundClassification>
-)
-
-/**
- * ViewModel que gestiona la recuperación y presentación del histórico de mediciones acústicas.
+ * ViewModel que gestiona la recuperacion y presentacion del historico de mediciones acusticas.
  */
 class HistoryViewModel(application: Application) : AndroidViewModel(application) {
-    private val db = AppDatabase.getDatabase(application)
-    private val explanationService by lazy { NoiseExplanationService() }
-    
-    private val _samples = MutableStateFlow<List<AudioSample>>(emptyList())
-    val samples: StateFlow<List<AudioSample>> = _samples.asStateFlow()
+    private val historyRepository: HistoryRepository = RepositoryProvider.historyRepository(application)
+    private val explanationRepository: NoiseExplanationRepository = RepositoryProvider.noiseExplanationRepository()
 
-    private val _selectedSampleDetails = MutableStateFlow<FullSampleData?>(null)
-    val selectedSampleDetails: StateFlow<FullSampleData?> = _selectedSampleDetails.asStateFlow()
+    private val _samples = MutableStateFlow<List<AudioSampleRecord>>(emptyList())
+    val samples: StateFlow<List<AudioSampleRecord>> = _samples.asStateFlow()
+
+    private val _selectedSampleDetails = MutableStateFlow<FullAudioSample?>(null)
+    val selectedSampleDetails: StateFlow<FullAudioSample?> = _selectedSampleDetails.asStateFlow()
 
     private val _explainingSampleId = MutableStateFlow<Long?>(null)
     val explainingSampleId: StateFlow<Long?> = _explainingSampleId.asStateFlow()
@@ -42,42 +36,36 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
         loadSamples()
     }
 
-    /**
-     * Recupera el listado completo de muestras almacenadas en la base de datos local.
-     */
     private fun loadSamples() {
         viewModelScope.launch {
-            db.audioSampleDao().getAllSamples().collect {
-                _samples.value = it
+            historyRepository.observeSamples().collect { samples ->
+                _samples.value = samples
             }
         }
     }
 
-    /**
-     * Carga el detalle completo (espectro y etiquetas IA) para una muestra específica.
-     */
-    fun loadSampleDetails(sample: AudioSample) {
+    fun loadSampleDetails(sample: AudioSampleRecord) {
+        if (_selectedSampleDetails.value?.sample?.id == sample.id) {
+            _selectedSampleDetails.value = null
+            return
+
+        }
+
         viewModelScope.launch {
-            val bins = db.frequencyBinDao().getBinsForSample(sample.id)
-            val classifications = db.soundClassificationDao().getClassificationsForSample(sample.id)
-            
-            _selectedSampleDetails.value = FullSampleData(sample, bins, classifications)
+            _selectedSampleDetails.value = historyRepository.getSampleDetails(sample)
         }
     }
 
-    /**
-     * Elimina una muestra de la base de datos.
-     */
-    fun deleteSample(sample: AudioSample) {
+    fun deleteSample(sample: AudioSampleRecord) {
         viewModelScope.launch {
-            db.audioSampleDao().deleteSample(sample)
+            historyRepository.deleteSample(sample)
             if (_selectedSampleDetails.value?.sample?.id == sample.id) {
                 _selectedSampleDetails.value = null
             }
         }
     }
 
-    fun explainSample(sample: AudioSample) {
+    fun explainSample(sample: AudioSampleRecord) {
         if (_explainingSampleId.value != null) return
 
         viewModelScope.launch {
@@ -89,18 +77,12 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
                 val details = if (currentDetails?.sample?.id == sample.id) {
                     currentDetails
                 } else {
-                    val bins = db.frequencyBinDao().getBinsForSample(sample.id)
-                    val classifications = db.soundClassificationDao().getClassificationsForSample(sample.id)
-                    FullSampleData(sample, bins, classifications)
+                    historyRepository.getSampleDetails(sample)
                 }
 
-                val explanation = explanationService.explainSample(
-                    sample = details.sample,
-                    bins = details.bins,
-                    classifications = details.classifications
-                )
+                val explanation = explanationRepository.explainSample(details)
+                historyRepository.updateAiExplanation(sample.id, explanation)
 
-                db.audioSampleDao().updateAiExplanation(sample.id, explanation)
                 _selectedSampleDetails.value = details.copy(
                     sample = details.sample.copy(aiExplanation = explanation)
                 )

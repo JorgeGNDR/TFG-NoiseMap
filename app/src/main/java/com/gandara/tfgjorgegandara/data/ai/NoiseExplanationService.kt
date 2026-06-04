@@ -1,9 +1,11 @@
 package com.gandara.tfgjorgegandara.data.ai
 
-import com.gandara.tfgjorgegandara.data.local.AudioSample
-import com.gandara.tfgjorgegandara.data.local.FrequencyBin
-import com.gandara.tfgjorgegandara.data.local.SoundClassification
+import com.gandara.tfgjorgegandara.domain.model.AudioSampleRecord
+import com.gandara.tfgjorgegandara.domain.model.FrequencyBandEnergy
+import com.gandara.tfgjorgegandara.domain.model.FullAudioSample
+import com.gandara.tfgjorgegandara.domain.model.SoundDetection
 import com.gandara.tfgjorgegandara.domain.model.ThirdOctaveBands
+import com.gandara.tfgjorgegandara.domain.repository.NoiseExplanationRepository
 import com.google.firebase.Firebase
 import com.google.firebase.ai.ai
 import com.google.firebase.ai.type.GenerativeBackend
@@ -15,7 +17,7 @@ import com.google.firebase.ai.type.thinkingConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class NoiseExplanationService {
+class NoiseExplanationService : NoiseExplanationRepository {
     private val model = Firebase.ai(backend = GenerativeBackend.googleAI())
         .generativeModel(
             modelName = "gemini-2.5-flash",
@@ -28,13 +30,9 @@ class NoiseExplanationService {
             }
         )
 
-    suspend fun explainSample(
-        sample: AudioSample,
-        bins: List<FrequencyBin>,
-        classifications: List<SoundClassification>
-    ): String = withContext(Dispatchers.IO) {
+    override suspend fun explainSample(sample: FullAudioSample): String = withContext(Dispatchers.IO) {
         val responseText = try {
-            extractText(model.generateContent(buildPrompt(sample, bins, classifications)))
+            extractText(model.generateContent(buildPrompt(sample.sample, sample.bins, sample.classifications)))
         } catch (e: ResponseStoppedException) {
             extractText(e.response)
         }
@@ -57,9 +55,9 @@ class NoiseExplanationService {
     }
 
     private fun buildPrompt(
-        sample: AudioSample,
-        bins: List<FrequencyBin>,
-        classifications: List<SoundClassification>
+        sample: AudioSampleRecord,
+        bins: List<FrequencyBandEnergy>,
+        classifications: List<SoundDetection>
     ): String {
         val labels = classifications.take(4).joinToString { item ->
             "${item.label} ${(item.probability * 100).toInt()}%"

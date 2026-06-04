@@ -12,7 +12,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.gandara.tfgjorgegandara.data.local.AudioSample
+import com.gandara.tfgjorgegandara.domain.model.AudioSampleRecord
+import com.gandara.tfgjorgegandara.domain.model.FullAudioSample
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -25,7 +26,7 @@ fun HistoryScreen(viewModel: HistoryViewModel) {
     val details by viewModel.selectedSampleDetails.collectAsState()
     val explainingSampleId by viewModel.explainingSampleId.collectAsState()
     val explanationError by viewModel.explanationError.collectAsState()
-    var sampleToDelete by remember { mutableStateOf<AudioSample?>(null) }
+    var sampleToDelete by remember { mutableStateOf<AudioSampleRecord?>(null) }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text(
@@ -54,7 +55,7 @@ fun HistoryScreen(viewModel: HistoryViewModel) {
         AlertDialog(
             onDismissRequest = { sampleToDelete = null },
             title = { Text("Eliminar muestra") },
-            text = { Text("Estas seguro de que deseas eliminar esta medicion? Esta accion no se puede deshacer.") },
+            text = { Text("Estás seguro de que quieres eliminar esta medición? Esta acción no se puede deshacer.") },
             confirmButton = {
                 TextButton(onClick = {
                     sampleToDelete?.let { viewModel.deleteSample(it) }
@@ -90,13 +91,13 @@ fun HistoryScreen(viewModel: HistoryViewModel) {
  */
 @Composable
 fun SampleItem(
-    sample: AudioSample,
+    sample: AudioSampleRecord,
     isSelected: Boolean,
     onClick: () -> Unit,
     onDelete: () -> Unit,
     onExplain: () -> Unit,
     isExplaining: Boolean,
-    details: FullSampleData?
+    details: FullAudioSample?
 ) {
     val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
     val dateString = dateFormat.format(Date(sample.timestamp))

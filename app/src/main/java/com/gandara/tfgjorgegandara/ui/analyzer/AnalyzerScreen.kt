@@ -29,11 +29,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.gandara.tfgjorgegandara.ui.common.LocationViewModel
 
 import com.gandara.tfgjorgegandara.R
+import com.gandara.tfgjorgegandara.domain.model.WeightingType
 import com.gandara.tfgjorgegandara.ui.theme.*
 
 /**
  * Pantalla principal del analizador acústico.
- * Visualiza niveles de presión sonora, espectro de frecuencias e identificación de sonidos.
+ * Visualiza niveles de presión sonora (AVG, dB(), PEAK), espectro de frecuencias (logarítmico) e identificación de sonidos (YAMNET).
+ * Botón de grabación de muestras, pausa, selector de ponderación
  */
 @Composable
 fun AnalyzerScreen(
@@ -53,7 +55,7 @@ fun AnalyzerScreen(
             .padding(top = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Región de indicadores numéricos principales (AVG, dB actual, PEAK)
+        // Indicadores de arriba (AVG, dB actual, PEAK)
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -232,20 +234,20 @@ fun AnalyzerScreen(
 private fun WeightingInfoDialog(onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Ponderaciones acusticas") },
+        title = { Text("Ponderaciones acústicas") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 WeightingInfoLine(
                     title = "A",
-                    body = "Aproxima como percibe el oido humano. Reduce mucho graves y agudos extremos. Es la mas habitual para ruido ambiental."
+                    body = "Aproxima cómo percibe el oído humano. Reduce mucho los graves y los agudos extremos. Es la más habitual para medir ruido ambiental."
                 )
                 WeightingInfoLine(
                     title = "C",
-                    body = "Mantiene mas peso en bajas frecuencias. Es util para sonidos fuertes, graves o impactos."
+                    body = "Mantiene más peso en las bajas frecuencias. Es útil para sonidos fuertes, graves o impactos."
                 )
                 WeightingInfoLine(
                     title = "Z",
-                    body = "No aplica correccion perceptiva. Muestra la energia de la señal de forma mas plana y tecnica."
+                    body = "No aplica corrección perceptiva. Muestra la energía de la señal de forma más plana y técnica."
                 )
             }
         },
@@ -261,7 +263,7 @@ private fun WeightingInfoDialog(onDismiss: () -> Unit) {
 private fun WeightingInfoLine(title: String, body: String) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(
-            text = "Ponderacion $title",
+            text = "Ponderación $title",
             color = PowerOrange,
             fontWeight = FontWeight.Bold
         )

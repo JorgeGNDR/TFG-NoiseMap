@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Place
@@ -32,7 +33,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.gandara.tfgjorgegandara.settings.AppSettings
+import com.gandara.tfgjorgegandara.data.settings.AppSettings
 import com.gandara.tfgjorgegandara.ui.analyzer.AnalyzerScreen
 import com.gandara.tfgjorgegandara.ui.common.LocationViewModel
 import com.gandara.tfgjorgegandara.ui.history.HistoryScreen
@@ -45,7 +46,7 @@ import org.maplibre.android.MapLibre
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
     object Analyzer : Screen("analyzer", "Analizador", Icons.Default.Home)
     object Map : Screen("map", "Mapa", Icons.Default.Place)
-    object History : Screen("history", "Historial", Icons.Default.List)
+    object History : Screen("history", "Historial", Icons.AutoMirrored.Filled.List)
     object Settings : Screen("settings", "Ajustes", Icons.Default.Settings)
 }
 
@@ -53,6 +54,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Inicializa MapLibre y Configuración
         MapLibre.getInstance(this)
         AppSettings.init(this)
 
@@ -62,6 +64,7 @@ class MainActivity : ComponentActivity() {
                 val context = LocalContext.current
                 val lifecycleOwner = LocalLifecycleOwner.current
 
+                // Declaración de los permisos necesarios
                 val permissions = arrayOf(
                     Manifest.permission.RECORD_AUDIO,
                     Manifest.permission.ACCESS_FINE_LOCATION,
@@ -76,6 +79,7 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
+                // Lanzador de solicitud de permisos
                 val permissionLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestMultiplePermissions(),
                     onResult = { result ->
@@ -86,6 +90,7 @@ class MainActivity : ComponentActivity() {
                     }
                 )
 
+                // Comprobamos si tenemos permisos ya o si todavía no tenemos. Si no, se solicitan
                 LaunchedEffect(Unit) {
                     if (!permissionsGranted) {
                         permissionLauncher.launch(permissions)
@@ -116,6 +121,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // Menú de navegación de abajo (Analizador/Mapa/Historial/Ajustes)
                 Scaffold(
                     bottomBar = { BottomBar(navController) }
                 ) { innerPadding ->
@@ -154,6 +160,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// Pantalla mientras se solicitan los permisos
 @Composable
 private fun PermissionWaitingScreen(
     modifier: Modifier = Modifier,
@@ -173,7 +180,7 @@ private fun PermissionWaitingScreen(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "La app necesita microfono y ubicacion para analizar y guardar muestras de ruido.",
+            text = "La app necesita micrófono y ubicación para analizar y guardar muestras de ruido.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

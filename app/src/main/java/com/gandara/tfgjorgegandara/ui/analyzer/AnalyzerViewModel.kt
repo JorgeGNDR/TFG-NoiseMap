@@ -1,17 +1,19 @@
-package com.gandara.tfgjorgegandara.ui.analyzer
+﻿package com.gandara.tfgjorgegandara.ui.analyzer
 
 import android.app.Application
 import android.location.Location
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.gandara.tfgjorgegandara.domain.model.WeightingType
 import com.gandara.tfgjorgegandara.data.repository.RepositoryProvider
-import com.gandara.tfgjorgegandara.domain.model.ThirdOctaveBands
 import com.gandara.tfgjorgegandara.domain.repository.AudioRepository
-import com.gandara.tfgjorgegandara.dsp.AudioCaptureManager
+import com.gandara.tfgjorgegandara.data.audio.AudioCaptureManager
 import com.gandara.tfgjorgegandara.dsp.FFTCalculator
-import com.gandara.tfgjorgegandara.ml.SoundClassifierManager
-import com.gandara.tfgjorgegandara.settings.AppSettings
+import com.gandara.tfgjorgegandara.dsp.SpectrumWeighting
+import com.gandara.tfgjorgegandara.dsp.ThirdOctaveCalculator
+import com.gandara.tfgjorgegandara.data.ml.SoundClassifierManager
+import com.gandara.tfgjorgegandara.data.settings.AppSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -19,20 +21,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.math.log10
 import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.pow
 
 /**
- * Tipos de ponderación frecuencial aplicables al análisis sonoro.
- */
-enum class WeightingType { A, C, Z }
-
-/**
- * Estado que representa los datos de análisis sonoro en tiempo real y el progreso de captura.
+ * Estado que representa los datos de anÃ¡lisis sonoro en tiempo real y el progreso de captura.
  */
 data class AnalyzerState(
     val isPaused: Boolean = false,
@@ -53,9 +48,13 @@ data class AnalyzerState(
 )
 
 /**
- * ViewModel que gestiona la lógica de procesamiento digital de señales (DSP) e inteligencia artificial.
+ * ViewModel que gestiona la lÃ³gica de procesamiento digital de seÃ±ales (DSP) e inteligencia artificial.
  */
 class AnalyzerViewModel(application: Application) : AndroidViewModel(application) {
+    private companion object {
+        const val SAMPLE_RATE = 44100
+    }
+
     private var currentBufferSize = AppSettings.state.value.spectrumBufferSize
     private var audioManager = AudioCaptureManager(currentBufferSize)
     private var fftCalculator = FFTCalculator(currentBufferSize)
@@ -70,7 +69,7 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
     private var lastUiUpdateTime = 0L
     private val UI_UPDATE_INTERVAL_MS = 50L
     private var classificationCounter = 0
-    private val CLASSIFICATION_INTERVAL = 10 // Ejecución periódica de clasificación (~500ms)
+    private val CLASSIFICATION_INTERVAL = 10 // EjecuciÃ³n periÃ³dica de clasificaciÃ³n (~500ms)
 
     private var sumOfSquarePressures = 0.0
     private var dbCount = 0
@@ -87,7 +86,7 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
     private var captureCount = 0
     private var captureMaxDb = -100.0
     
-    // Almacén para YAMNet durante los 3 segundos
+    // AlmacÃ©n para YAMNet durante los 3 segundos
     private val captureYAMNetLabels = mutableMapOf<String, Float>()
 
     init {
@@ -124,18 +123,18 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
-     * Inicia el bucle de captura y análisis FFT de la señal de audio.
+     * Inicia el bucle de captura y analisis FFT de la senal de audio.
      */
     fun startAnalyzing() {
         audioManager.startRecording { audioBuffer, _ ->
-            val results = fftCalculator.calculateWeightings(audioBuffer, 44100, _uiState.value.offset)
+            val results = fftCalculator.calculateWeightings(audioBuffer, SAMPLE_RATE, _uiState.value.offset)
             val currentDb = when (_uiState.value.selectedWeighting) {
                 WeightingType.A -> results.a
                 WeightingType.C -> results.c
                 WeightingType.Z -> results.z
             }
 
-            // Gestión de la clasificación por redes neuronales (YAMNet) - CAMINO A
+            // GestiÃ³n de la clasificaciÃ³n por redes neuronales (YAMNet) - CAMINO A
             classificationCounter++
             if (classificationCounter >= CLASSIFICATION_INTERVAL) {
                 classificationCounter = 0
@@ -168,7 +167,7 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
-     * Procesa y acumula los datos durante una sesión de captura controlada.
+     * Procesa y acumula los datos durante una sesiÃ³n de captura controlada.
      */
     private fun processCaptureData(currentDb: Double, spectrum: FloatArray) {
         captureDbSum += currentDb
@@ -183,7 +182,7 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
             }
         }
 
-        // No es necesaria la clasificación energética manual por bandas básicas aquí
+        // No es necesaria la clasificaciÃ³n energÃ©tica manual por bandas bÃ¡sicas aquÃ­
         // Ya que ahora calculamos tercios de octava completos al finalizar
     }
 
@@ -191,22 +190,15 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
      * Actualiza el estado de la UI con los valores calculados de intensidad y espectro.
      */
     private fun updateVisuals(currentDb: Double, results: FFTCalculator.WeightedResults) {
-        val binSize = 44100.0 / currentBufferSize
-        val weightedSpectrum = results.spectrum.clone()
+        val weightedSpectrum = SpectrumWeighting.applyVisualWeighting(
+            spectrum = results.spectrum,
+            weightingType = _uiState.value.selectedWeighting,
+            fftCalculator = fftCalculator,
+            sampleRate = SAMPLE_RATE,
+            fftSize = currentBufferSize
+        )
 
-        // Aplicación de ponderación al espectro visual si no es Z (lineal)
-        if (_uiState.value.selectedWeighting != WeightingType.Z) {
-            for (i in weightedSpectrum.indices) {
-                val weight = when (_uiState.value.selectedWeighting) {
-                    WeightingType.A -> fftCalculator.getAWeight(i * binSize)
-                    WeightingType.C -> fftCalculator.getCWeight(i * binSize)
-                    else -> 0.0
-                }
-                weightedSpectrum[i] = (weightedSpectrum[i] + weight).toFloat()
-            }
-        }
-
-        // Lógica de "Peak Hold" para la visualización del espectro
+        // LÃ³gica de "Peak Hold" para la visualizaciÃ³n del espectro
         if (currentPeakHold.size != weightedSpectrum.size) currentPeakHold = weightedSpectrum.clone()
         else {
             for (i in weightedSpectrum.indices) {
@@ -235,7 +227,7 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
-     * Inicia una sesión de captura de datos de duración determinada (5s).
+     * Inicia una sesiÃ³n de captura de datos de duraciÃ³n determinada (5s).
      */
     fun startCaptureSession(location: Location? = null) {
         if (_uiState.value.isCapturing) return
@@ -257,22 +249,16 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
-     * Finaliza la sesión de captura y persiste los resultados en la base de datos.
+     * Finaliza la sesiÃ³n de captura y persiste los resultados en la base de datos.
      */
     private fun finalizeCapture(location: Location?) {
         isCaptureActive = false
         val avgDb = if (captureCount > 0) captureDbSum / captureCount else 0.0
         val finalSpectrum = captureSpectrumSum?.map { it / captureCount }?.toFloatArray() ?: FloatArray(0)
         
-        // Calcular frecuencia dominante
-        var dominantFreq = 0f
-        if (finalSpectrum.isNotEmpty()) {
-            val maxIndex = finalSpectrum.indices.maxByOrNull { finalSpectrum[it] } ?: 0
-            dominantFreq = (maxIndex * 44100f / currentBufferSize)
-        }
+        val dominantFreq = ThirdOctaveCalculator.dominantFrequency(finalSpectrum, SAMPLE_RATE, currentBufferSize)
 
-        // Convertir espectro FFT a 1/3 Octava (Simplificado para el repositorio)
-        val thirdOctaveBands = calculateThirdOctaveBands(finalSpectrum)
+        val thirdOctaveBands = ThirdOctaveCalculator.calculateBands(finalSpectrum, SAMPLE_RATE, currentBufferSize)
 
         viewModelScope.launch(Dispatchers.IO) {
             val state = _uiState.value
@@ -291,46 +277,6 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
         }
         
         _uiState.update { it.copy(isCapturing = false, captureProgress = 0f) }
-    }
-
-    /**
-     * Agrupa el espectro FFT en 31 bandas de tercio de octava.
-     */
-    private fun calculateThirdOctaveBands(fftSpectrum: FloatArray): FloatArray {
-        val bands = FloatArray(ThirdOctaveBands.CENTER_FREQUENCIES_HZ.size)
-        val binSize = 44100.0 / currentBufferSize.toDouble()
-        
-        ThirdOctaveBands.CENTER_FREQUENCIES_HZ.forEachIndexed { index, centerFreq ->
-            val lowerFreq = centerFreq / 1.122
-            val upperFreq = centerFreq * 1.122
-            
-            var energySum = 0.0
-            var count = 0
-            
-            fftSpectrum.forEachIndexed { bin, dbValue ->
-                val freq = bin * binSize
-                if (freq in lowerFreq..upperFreq) {
-                    energySum += 10.0.pow(dbValue / 10.0)
-                    count++
-                }
-            }
-            
-            bands[index] = if (count > 0) (10.0 * log10(energySum / count)).toFloat() else -20f
-        }
-        return bands
-    }
-
-    /**
-     * Remuestrea la señal de audio de 44.1kHz a 16kHz para compatibilidad con el modelo ML.
-     */
-    private fun resampleTo16kHz(input: FloatArray): FloatArray {
-        val outputSize = (input.size * 16000.0 / 44100.0).toInt()
-        val output = FloatArray(outputSize)
-        for (i in output.indices) {
-            val inputIndex = (i * input.size / outputSize).coerceAtMost(input.size - 1)
-            output[i] = input[inputIndex]
-        }
-        return output
     }
 
     private fun resetCaptureAccumulators() {
