@@ -205,7 +205,7 @@ fun AnalyzerScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Accionador principal de captura geolocalizada
+        // Boton de capturar muestra de 3s
         Box(
             modifier = Modifier
                 .size(65.dp)

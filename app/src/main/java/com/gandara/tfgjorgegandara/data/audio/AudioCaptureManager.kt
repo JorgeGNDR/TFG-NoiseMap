@@ -29,10 +29,8 @@ class AudioCaptureManager(private val fftSize: Int = 4096) {
     private var captureJob: Job? = null
     private val captureScope = CoroutineScope(Dispatchers.IO)
 
-    /**
-     * Inicia la captura de audio de forma asíncrona.
-     * @param onDataReady Callback que se invoca cada vez que se llena un buffer con datos de audio y su nivel en dB.
-     */
+    // Inicia la captura de audio
+
     @SuppressLint("MissingPermission")
     fun startRecording(onDataReady: (ShortArray, Double) -> Unit) {
         if (isRecording) return

@@ -77,12 +77,12 @@ class NoiseExplanationService : NoiseExplanationRepository {
             .ifBlank { "sin datos espectrales" }
 
         return """
-            Explica esta medicion de ruido ambiental para una persona sin conocimientos de audio.
-            Responde en espanol, en 3 frases breves, sin listas y sin tecnicismos innecesarios.
+            Explica esta medición de ruido ambiental para una persona sin conocimientos de audio.
+            Responde en español, en 3 frases breves, sin listas y sin tecnicismos innecesarios.
 
             Datos: nivel medio ${"%.1f".format(sample.avgDb)} dB(${sample.weighting}), pico ${"%.1f".format(sample.peakDb)} dB, frecuencia dominante ${sample.dominantFreq.toInt()} Hz, sonidos detectados: $labels, bandas con mas energia: $strongestBands.
 
-            Indica si parece bajo, moderado o elevado, que podria causarlo y que significa para el usuario.
+            Indica si parece bajo, moderado o elevado, que podria causarlo, que significa para el usuario y sus consecuencias a largo plazo.
         """.trimIndent()
     }
 }

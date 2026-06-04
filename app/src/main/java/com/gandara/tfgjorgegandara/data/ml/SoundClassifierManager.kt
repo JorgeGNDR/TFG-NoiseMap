@@ -8,7 +8,7 @@ import org.tensorflow.lite.support.audio.TensorAudio
 import org.tensorflow.lite.task.core.BaseOptions
 
 /**
- * Gestor del motor de inferencia TensorFlow Lite para la clasificaciÃ³n de sonidos ambientales.
+ * Gestor del motor de inferencia TensorFlow Lite para la clasificación de sonidos ambientales.
  * Utiliza el modelo pre-entrenado YAMNet.
  */
 class SoundClassifierManager(context: Context) {
@@ -33,10 +33,10 @@ class SoundClassifierManager(context: Context) {
                 .setMaxResults(2)
                 .build()
 
-            // InicializaciÃ³n del motor de TFLite
+            // Inicialización del motor de TFLite
             classifier = AudioClassifier.createFromFileAndOptions(context, MODEL_PATH, options)
             
-            // ConfiguraciÃ³n automatizada del buffer de audio conforme a los requisitos del modelo (16 kHz)
+            // Configuración automatizada del buffer de audio conforme a los requisitos del modelo (16 kHz)
             tensorAudio = classifier?.createInputTensorAudio()
             audioRecord = classifier?.createAudioRecord()
 
@@ -69,15 +69,15 @@ class SoundClassifierManager(context: Context) {
     }
 
     /**
-     * Realiza la clasificaciÃ³n del sonido actual leyendo directamente de su propio flujo de audio.
-     * Este mÃ©todo garantiza que YAMNet reciba el contexto completo (aprox 1s) que necesita.
+     * Realiza la clasificación del sonido actual leyendo directamente de su propio flujo de audio.
+     * Este método garantiza que YAMNet reciba el contexto completo (aprox 1s) que necesita.
      */
     fun classifyContinuous(): String {
         val currentClassifier = classifier ?: return "Inicializando..."
         val currentTensor = tensorAudio ?: return "Cargando..."
 
         return try {
-            // Lee los datos del micrÃ³fono interno configurado por TensorFlow a 16kHz
+            // Lee los datos del micrófono interno configurado por TensorFlow a 16kHz
             currentTensor.load(audioRecord)
             val results = currentClassifier.classify(currentTensor)
             val topCategory = results.firstOrNull()?.categories?.firstOrNull()
@@ -88,7 +88,7 @@ class SoundClassifierManager(context: Context) {
                 "Analizando..."
             }
         } catch (e: Exception) {
-            "Error al leer datos del micrÃ³fono. Comprueba permisos"
+            "Error al leer datos del micrófono. Comprueba permisos"
         }
     }
 

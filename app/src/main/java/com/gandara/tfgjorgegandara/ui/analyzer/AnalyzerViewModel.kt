@@ -131,7 +131,7 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
                 WeightingType.Z -> results.z
             }
 
-            // GestiÃ³n de la clasificaciÃ³n por redes neuronales (YAMNet) - CAMINO A
+            // Gestión de la clasificación por redes neuronales (YAMNet) - CAMINO A
             classificationCounter++
             if (classificationCounter >= CLASSIFICATION_INTERVAL) {
                 classificationCounter = 0
@@ -164,7 +164,7 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
-     * Procesa y acumula los datos durante una sesiÃ³n de captura controlada.
+     * Procesa y acumula los datos durante una sesión de captura controlada.
      */
     private fun processCaptureData(currentDb: Double, spectrum: FloatArray) {
         captureDbSum += currentDb
@@ -179,7 +179,7 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
             }
         }
 
-        // No es necesaria la clasificaciÃ³n energÃ©tica manual por bandas bÃ¡sicas aquÃ­
+        // No es necesaria la clasificación energética manual por bandas básicas aquí
         // Ya que ahora calculamos tercios de octava completos al finalizar
     }
 
@@ -195,7 +195,7 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
             fftSize = currentBufferSize
         )
 
-        // LÃ³gica de "Peak Hold" para la visualizaciÃ³n del espectro
+        // Lógica de "Peak Hold" para la visualización del espectro
         if (currentPeakHold.size != weightedSpectrum.size) currentPeakHold = weightedSpectrum.clone()
         else {
             for (i in weightedSpectrum.indices) {
@@ -224,7 +224,7 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
-     * Inicia una sesiÃ³n de captura de datos de duraciÃ³n determinada (5s).
+     * Inicia una sesión de captura de datos de duración determinada (5s).
      */
     fun startCaptureSession(location: Location? = null) {
         if (_uiState.value.isCapturing) return
@@ -246,7 +246,7 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
-     * Finaliza la sesiÃ³n de captura y persiste los resultados en la base de datos.
+     * Finaliza la sesión de captura y persiste los resultados en la base de datos.
      */
     private fun finalizeCapture(location: Location?) {
         isCaptureActive = false
