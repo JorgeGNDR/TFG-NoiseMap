@@ -12,7 +12,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
@@ -121,7 +120,8 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // Menú de navegación de abajo (Analizador/Mapa/Historial/Ajustes)
+                // Cargamos las pantallas, por defecto la de Analyzer.
+                // Si los permisos no han sido concedidos cargamos la pantalla de permisos.
                 Scaffold(
                     bottomBar = { BottomBar(navController) }
                 ) { innerPadding ->

@@ -1,4 +1,4 @@
-package com.gandara.tfgjorgegandara.data.ml
+﻿package com.gandara.tfgjorgegandara.data.ml
 
 import android.content.Context
 import android.media.AudioRecord
@@ -8,7 +8,7 @@ import org.tensorflow.lite.support.audio.TensorAudio
 import org.tensorflow.lite.task.core.BaseOptions
 
 /**
- * Gestor del motor de inferencia TensorFlow Lite para la clasificación de sonidos ambientales.
+ * Gestor del motor de inferencia TensorFlow Lite para la clasificaciÃ³n de sonidos ambientales.
  * Utiliza el modelo pre-entrenado YAMNet.
  */
 class SoundClassifierManager(context: Context) {
@@ -33,14 +33,14 @@ class SoundClassifierManager(context: Context) {
                 .setMaxResults(2)
                 .build()
 
-            // Inicialización del motor de TFLite
+            // InicializaciÃ³n del motor de TFLite
             classifier = AudioClassifier.createFromFileAndOptions(context, MODEL_PATH, options)
             
-            // Configuración automatizada del buffer de audio conforme a los requisitos del modelo (16kHz)
+            // ConfiguraciÃ³n automatizada del buffer de audio conforme a los requisitos del modelo (16 kHz)
             tensorAudio = classifier?.createInputTensorAudio()
             audioRecord = classifier?.createAudioRecord()
 
-            Log.d(TAG, "Motor de inteligencia artificial inicializado correctamente.")
+            Log.d(TAG, "Motor YAMNet inicializado correctamente.")
         } catch (e: Exception) {
             Log.e(TAG, "Fallo al cargar el modelo YAMNet: ${e.message}")
         }
@@ -69,15 +69,15 @@ class SoundClassifierManager(context: Context) {
     }
 
     /**
-     * Realiza la clasificación del sonido actual leyendo directamente de su propio flujo de audio.
-     * Este método garantiza que YAMNet reciba el contexto completo (aprox 1s) que necesita.
+     * Realiza la clasificaciÃ³n del sonido actual leyendo directamente de su propio flujo de audio.
+     * Este mÃ©todo garantiza que YAMNet reciba el contexto completo (aprox 1s) que necesita.
      */
     fun classifyContinuous(): String {
         val currentClassifier = classifier ?: return "Inicializando..."
         val currentTensor = tensorAudio ?: return "Cargando..."
 
         return try {
-            // Lee los datos del micrófono interno configurado por TensorFlow a 16kHz
+            // Lee los datos del micrÃ³fono interno configurado por TensorFlow a 16kHz
             currentTensor.load(audioRecord)
             val results = currentClassifier.classify(currentTensor)
             val topCategory = results.firstOrNull()?.categories?.firstOrNull()
@@ -88,29 +88,7 @@ class SoundClassifierManager(context: Context) {
                 "Analizando..."
             }
         } catch (e: Exception) {
-            "Error al leer datos del micrófono. Comprueba permisos"
-        }
-    }
-
-    /**
-     * Realiza la clasificación de un fragmento de audio específico (usado en post-procesamiento).
-     */
-    fun classify(resampled: FloatArray): String {
-        val currentClassifier = classifier ?: return "Inicializando..."
-        val currentTensor = tensorAudio ?: return "Error de memoria"
-
-        return try {
-            currentTensor.load(resampled, 0, resampled.size)
-            val results = currentClassifier.classify(currentTensor)
-            val topCategory = results.firstOrNull()?.categories?.firstOrNull()
-
-            if (topCategory != null) {
-                "${topCategory.label} (${(topCategory.score * 100).toInt()}%)"
-            } else {
-                "NULL"
-            }
-        } catch (e: Exception) {
-            "Analizando..."
+            "Error al leer datos del micrÃ³fono. Comprueba permisos"
         }
     }
 

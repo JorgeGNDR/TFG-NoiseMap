@@ -27,7 +27,7 @@ import kotlin.math.max
 import kotlin.math.pow
 
 /**
- * Estado que representa los datos de anÃ¡lisis sonoro en tiempo real y el progreso de captura.
+ * Estado que representa los datos de análisis sonoro en tiempo real y el progreso de captura.
  */
 data class AnalyzerState(
     val isPaused: Boolean = false,
@@ -47,9 +47,6 @@ data class AnalyzerState(
     val isAutoSaving: Boolean = false
 )
 
-/**
- * ViewModel que gestiona la lÃ³gica de procesamiento digital de seÃ±ales (DSP) e inteligencia artificial.
- */
 class AnalyzerViewModel(application: Application) : AndroidViewModel(application) {
     private companion object {
         const val SAMPLE_RATE = 44100
@@ -69,7 +66,7 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
     private var lastUiUpdateTime = 0L
     private val UI_UPDATE_INTERVAL_MS = 50L
     private var classificationCounter = 0
-    private val CLASSIFICATION_INTERVAL = 10 // EjecuciÃ³n periÃ³dica de clasificaciÃ³n (~500ms)
+    private val CLASSIFICATION_INTERVAL = 10 // ejecución periódica de clasificación (~500ms)
 
     private var sumOfSquarePressures = 0.0
     private var dbCount = 0
@@ -86,7 +83,7 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
     private var captureCount = 0
     private var captureMaxDb = -100.0
     
-    // AlmacÃ©n para YAMNet durante los 3 segundos
+    // Almacén para YAMNet durante los 3 segundos
     private val captureYAMNetLabels = mutableMapOf<String, Float>()
 
     init {

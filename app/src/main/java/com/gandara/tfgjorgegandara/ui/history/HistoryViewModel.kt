@@ -13,9 +13,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-/**
- * ViewModel que gestiona la recuperacion y presentacion del historico de mediciones acusticas.
- */
 class HistoryViewModel(application: Application) : AndroidViewModel(application) {
     private val historyRepository: HistoryRepository = RepositoryProvider.historyRepository(application)
     private val explanationRepository: NoiseExplanationRepository = RepositoryProvider.noiseExplanationRepository()

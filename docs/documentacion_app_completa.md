@@ -474,7 +474,7 @@ Archivos:
 - `ui/theme/Color.kt`
 - `ui/theme/Theme.kt`
 - `ui/theme/Type.kt`
-- `ui/theme/NeuphormicModifier.kt`
+- `ui/theme/NeumorphicModifier.kt`
 
 El color principal de acento es:
 
@@ -616,4 +616,3 @@ La arquitectura no es purista al 100 %, pero es coherente, mantenible y adecuada
 ## 21. Posible frase para la memoria
 
 La aplicación se ha estructurado siguiendo un patrón MVVM con separación por capas inspirada en Clean Architecture. La capa de presentación se encarga de la interfaz y el estado visual, la capa de dominio define modelos e interfaces independientes de frameworks, y la capa de datos encapsula los detalles de persistencia, captura de audio, ubicación, clasificación local e integración con IA generativa. Esta organización facilita el mantenimiento, reduce el acoplamiento entre módulos y permite evolucionar la aplicación sin afectar de forma directa a la interfaz de usuario.
-
