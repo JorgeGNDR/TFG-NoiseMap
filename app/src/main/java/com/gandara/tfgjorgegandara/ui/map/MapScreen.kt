@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.gandara.tfgjorgegandara.BuildConfig
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -57,8 +58,17 @@ fun MapScreen(
     val heatmapPoints by mapViewModel.heatmapPoints.collectAsState()
     val currentLocation by locationViewModel.currentLocation.collectAsState()
     val isLoading by mapViewModel.isLoading.collectAsState()
+    val errorMessage by mapViewModel.errorMessage.collectAsState()
     val selectedBandIndex by mapViewModel.selectedBandIndex.collectAsState()
     val selectedTimeRange by mapViewModel.selectedTimeRange.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(errorMessage) {
+        errorMessage?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            mapViewModel.clearError()
+        }
+    }
 
     LaunchedEffect(Unit) {
         MapLibre.getInstance(context)
@@ -110,7 +120,9 @@ fun MapScreen(
                     getMapAsync { map ->
                         mapLibreMap = map
 
-                        map.setStyle(Style.Builder().fromUri("https://api.maptiler.com/maps/dataviz-v4/style.json?key=u1kPuvsJUJUIxnU1Ost0")) { style ->
+                        val mapStyleUrl = "https://api.maptiler.com/maps/dataviz-v4/style.json" +
+                            "?key=${BuildConfig.MAPTILER_API_KEY}"
+                        map.setStyle(Style.Builder().fromUri(mapStyleUrl)) { style ->
                             setupHeatmapLayer(style)
 
                             if (context.hasLocationPermission()) {
@@ -187,6 +199,13 @@ fun MapScreen(
         if (isLoading) {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter))
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 12.dp)
+        )
     }
 }
 

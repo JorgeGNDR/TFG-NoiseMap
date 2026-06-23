@@ -9,6 +9,7 @@ import com.gandara.tfgjorgegandara.data.location.LocationHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /**
@@ -20,11 +21,13 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
     
     private val _currentLocation = MutableStateFlow<Location?>(null)
     val currentLocation: StateFlow<Location?> = _currentLocation.asStateFlow()
+    private var locationUpdatesJob: Job? = null
 
     /**
      * Inicializa el flujo de actualizaciones de ubicación y recupera la posición inicial.
      */
     fun startLocationUpdates() {
+        if (locationUpdatesJob?.isActive == true) return
         Log.d("LocationViewModel", "Iniciando servicio de geoposicionamiento...")
         
         // Estrategia de recuperación rápida mediante caché
@@ -44,7 +47,7 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
         }
 
         // Suscripción al flujo continuo de actualizaciones
-        viewModelScope.launch {
+        locationUpdatesJob = viewModelScope.launch {
             locationHelper.getLocationUpdates(intervalInSeconds = 5).collect { location ->
                 if (location != null) {
                     _currentLocation.value = location

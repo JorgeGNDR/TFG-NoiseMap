@@ -6,13 +6,13 @@ interface AudioRepository {
     suspend fun saveCompleteAudioSample(
         avgDb: Float,
         peakDb: Float,
-        latitude: Double?,
-        longitude: Double?,
+        latitude: Double,
+        longitude: Double,
         spectralEnergy: FloatArray,
         labels: Map<String, Float>,
         dominantFreq: Float = 0f,
         weighting: String = "A"
-    )
+    ): Result<Long>
 
     suspend fun getHeatmapData(
         octaveIndex: Int,

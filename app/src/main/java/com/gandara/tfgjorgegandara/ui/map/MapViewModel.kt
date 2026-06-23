@@ -28,6 +28,9 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
     // Filtro de rango temporal (en horas)
     private val _selectedTimeRange = MutableStateFlow(24)
     val selectedTimeRange: StateFlow<Int> = _selectedTimeRange.asStateFlow()
@@ -86,6 +89,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         
         updateJob = viewModelScope.launch {
             _isLoading.value = true
+            _errorMessage.value = null
             try {
                 val bandIndex = _selectedBandIndex.value
                 val hours = _selectedTimeRange.value
@@ -103,11 +107,15 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 _heatmapPoints.value = points
             } catch (e: Exception) {
-                e.printStackTrace()
+                _errorMessage.value = "No se pudieron cargar las mediciones del mapa"
             } finally {
                 _isLoading.value = false
             }
         }
+    }
+
+    fun clearError() {
+        _errorMessage.value = null
     }
 
     /**

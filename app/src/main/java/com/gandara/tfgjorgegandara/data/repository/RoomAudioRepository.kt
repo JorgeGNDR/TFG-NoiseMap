@@ -1,6 +1,8 @@
 package com.gandara.tfgjorgegandara.data.repository
 
 import android.util.Log
+import androidx.room.withTransaction
+import com.gandara.tfgjorgegandara.data.local.AppDatabase
 import com.gandara.tfgjorgegandara.data.local.AudioSample
 import com.gandara.tfgjorgegandara.data.local.AudioSampleDao
 import com.gandara.tfgjorgegandara.data.local.FrequencyBin
@@ -15,6 +17,7 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
 class RoomAudioRepository(
+    private val database: AppDatabase,
     private val audioSampleDao: AudioSampleDao,
     private val geoTileDao: GeoTileDao,
     private val frequencyBinDao: FrequencyBinDao,
@@ -24,45 +27,46 @@ class RoomAudioRepository(
     override suspend fun saveCompleteAudioSample(
         avgDb: Float,
         peakDb: Float,
-        latitude: Double?,
-        longitude: Double?,
+        latitude: Double,
+        longitude: Double,
         spectralEnergy: FloatArray,
         labels: Map<String, Float>,
         dominantFreq: Float,
         weighting: String
-    ) {
+    ): Result<Long> {
         val timestamp = System.currentTimeMillis()
 
-        withContext(Dispatchers.IO) {
-            try {
-                val sample = AudioSample(
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                database.withTransaction {
+                    val sample = AudioSample(
                     timestamp = timestamp,
-                    latitude = latitude ?: 0.0,
-                    longitude = longitude ?: 0.0,
+                    latitude = latitude,
+                    longitude = longitude,
                     avgDb = avgDb,
                     peakDb = peakDb,
                     dominantFreq = dominantFreq,
                     weighting = weighting
                 )
-                val sampleId = audioSampleDao.insertSampleAndGetId(sample)
+                    val sampleId = audioSampleDao.insertSampleAndGetId(sample)
 
-                val bins = spectralEnergy.mapIndexed { index, energy ->
-                    FrequencyBin(sampleId = sampleId, band = index, energy = energy)
-                }
-                frequencyBinDao.insertBins(bins)
+                    val bins = spectralEnergy.mapIndexed { index, energy ->
+                        FrequencyBin(sampleId = sampleId, band = index, energy = energy)
+                    }
+                    frequencyBinDao.insertBins(bins)
 
-                val classifications = labels.map { (label, prob) ->
-                    SoundClassification(sampleId = sampleId, label = label, probability = prob)
-                }
-                soundClassificationDao.insertClassifications(classifications)
+                    val classifications = labels.map { (label, prob) ->
+                        SoundClassification(sampleId = sampleId, label = label, probability = prob)
+                    }
+                    soundClassificationDao.insertClassifications(classifications)
 
-                if (latitude != null && longitude != null) {
                     val tileId = calculateTileId(latitude, longitude)
                     val timeBucket = TimeUnit.MILLISECONDS.toHours(timestamp)
                     geoTileDao.upsertSampleToTile(tileId, timeBucket, avgDb.toDouble())
+                    sampleId
                 }
-            } catch (e: Exception) {
-                Log.e("RoomAudioRepository", "Fallo en la operacion de guardado: ${e.message}")
+            }.onFailure { error ->
+                Log.e("RoomAudioRepository", "Fallo en la operación de guardado", error)
             }
         }
     }

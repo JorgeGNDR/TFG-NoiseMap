@@ -11,6 +11,7 @@ object RepositoryProvider {
     fun audioRepository(context: Context): AudioRepository {
         val db = AppDatabase.getDatabase(context.applicationContext)
         return RoomAudioRepository(
+            db,
             db.audioSampleDao(),
             db.geoTileDao(),
             db.frequencyBinDao(),

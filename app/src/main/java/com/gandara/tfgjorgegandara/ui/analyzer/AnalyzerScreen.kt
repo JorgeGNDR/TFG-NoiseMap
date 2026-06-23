@@ -40,7 +40,8 @@ import com.gandara.tfgjorgegandara.ui.theme.*
 @Composable
 fun AnalyzerScreen(
     viewModel: AnalyzerViewModel = viewModel(),
-    locationViewModel: LocationViewModel = viewModel()
+    locationViewModel: LocationViewModel = viewModel(),
+    onRequestLocationPermission: () -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsState()
     val currentLocation by locationViewModel.currentLocation.collectAsState()
@@ -191,6 +192,8 @@ fun AnalyzerScreen(
             Column {
                 val statusText = when {
                     state.isCapturing -> "GRABANDO MUESTRA: ${(state.captureProgress * 100).toInt()}%"
+                    state.isSaving -> "GUARDANDO MUESTRA..."
+                    state.captureFeedback != null -> state.captureFeedback.orEmpty().uppercase()
                     state.isPaused -> "SEÑAL CONGELADA"
                     else -> state.detectedSound.ifEmpty { "Escuchando..." }.uppercase()
                 }
@@ -198,7 +201,7 @@ fun AnalyzerScreen(
                     text = statusText,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (state.isCapturing) PowerOrange else TextDark
+                    color = if (state.isCapturing || state.isSaving) PowerOrange else TextDark
                 )
             }
         }
@@ -211,7 +214,12 @@ fun AnalyzerScreen(
                 .size(65.dp)
                 .neumorphic(cornerRadius = 42.dp)
                 .background(NeumorphicBackground, shape = CircleShape)
-                .clickable { viewModel.startCaptureSession(currentLocation) },
+                .clickable(enabled = !state.isCapturing && !state.isSaving) {
+                    if (currentLocation == null) {
+                        onRequestLocationPermission()
+                    }
+                    viewModel.startCaptureSession(currentLocation)
+                },
             contentAlignment = Alignment.Center
         ) {
             Box(

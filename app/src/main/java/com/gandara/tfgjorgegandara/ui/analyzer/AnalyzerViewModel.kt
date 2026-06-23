@@ -10,6 +10,7 @@ import com.gandara.tfgjorgegandara.data.repository.RepositoryProvider
 import com.gandara.tfgjorgegandara.domain.repository.AudioRepository
 import com.gandara.tfgjorgegandara.data.audio.AudioCaptureManager
 import com.gandara.tfgjorgegandara.dsp.FFTCalculator
+import com.gandara.tfgjorgegandara.dsp.DecibelMath
 import com.gandara.tfgjorgegandara.dsp.SpectrumWeighting
 import com.gandara.tfgjorgegandara.dsp.ThirdOctaveCalculator
 import com.gandara.tfgjorgegandara.data.ml.SoundClassifierManager
@@ -44,7 +45,8 @@ data class AnalyzerState(
     val peakHoldSpectrum: FloatArray = FloatArray(0),
     val offset: Float = 90f,
     val detectedSound: String = "",
-    val isAutoSaving: Boolean = false
+    val isSaving: Boolean = false,
+    val captureFeedback: String? = null
 )
 
 class AnalyzerViewModel(application: Application) : AndroidViewModel(application) {
@@ -78,8 +80,10 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
     private var isCaptureActive = false
     private var captureStartTime = 0L
     private val CAPTURE_DURATION_MS = 3000L
-    private var captureSpectrumSum: FloatArray? = null
-    private var captureDbSum = 0.0
+    // Los niveles en decibelios son logarítmicos: durante la captura se acumula
+    // energía lineal y solo se vuelve a dB al finalizar la sesión.
+    private var captureSpectrumEnergySum: DoubleArray? = null
+    private var captureDbEnergySum = 0.0
     private var captureCount = 0
     private var captureMaxDb = -100.0
     
@@ -95,7 +99,6 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
 
         repository = RepositoryProvider.audioRepository(application)
         
-        classifierManager.start()
         startAnalyzing()
 
         viewModelScope.launch {
@@ -125,6 +128,7 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
     fun startAnalyzing() {
         audioManager.startRecording { audioBuffer, _ ->
             val results = fftCalculator.calculateWeightings(audioBuffer, SAMPLE_RATE, _uiState.value.offset)
+            classifierManager.offerAudio(audioBuffer, SAMPLE_RATE)
             val currentDb = when (_uiState.value.selectedWeighting) {
                 WeightingType.A -> results.a
                 WeightingType.C -> results.c
@@ -136,20 +140,20 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
             if (classificationCounter >= CLASSIFICATION_INTERVAL) {
                 classificationCounter = 0
                 viewModelScope.launch(Dispatchers.Default) {
-                    // Ahora classifyContinuous lee directamente de su propio buffer de 1s
-                    val label = classifierManager.classifyContinuous()
+                    // YAMNet consume la última ventana remuestreada del flujo compartido.
+                    val classification = classifierManager.classifyContinuous()
                     
-                    if (isCaptureActive) {
+                    if (isCaptureActive && classification.probability != null) {
                         synchronized(captureYAMNetLabels) {
-                            val cleanLabel = label.substringBefore(" (")
-                            if (cleanLabel != "AMBIENTE" && cleanLabel != "Analizando...") {
-                                val currentProb = captureYAMNetLabels.getOrDefault(cleanLabel, 0f)
-                                captureYAMNetLabels[cleanLabel] = max(currentProb, 0.7f)
-                            }
+                            val currentProb = captureYAMNetLabels.getOrDefault(classification.label, 0f)
+                            captureYAMNetLabels[classification.label] = max(
+                                currentProb,
+                                classification.probability
+                            )
                         }
                     }
                     
-                    _uiState.update { it.copy(detectedSound = label) }
+                    _uiState.update { it.copy(detectedSound = classification.displayText) }
                 }
             }
 
@@ -167,15 +171,18 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
      * Procesa y acumula los datos durante una sesión de captura controlada.
      */
     private fun processCaptureData(currentDb: Double, spectrum: FloatArray) {
-        captureDbSum += currentDb
+        captureDbEnergySum += DecibelMath.dbToEnergy(currentDb)
         captureCount++
         captureMaxDb = max(captureMaxDb, currentDb)
 
-        if (captureSpectrumSum == null) {
-            captureSpectrumSum = spectrum.clone()
-        } else {
+        if (captureSpectrumEnergySum == null) {
+            captureSpectrumEnergySum = DoubleArray(spectrum.size)
+        }
+
+        val energySum = captureSpectrumEnergySum
+        if (energySum != null) {
             for (i in spectrum.indices) {
-                captureSpectrumSum!![i] += spectrum[i]
+                energySum[i] += DecibelMath.dbToEnergy(spectrum[i].toDouble())
             }
         }
 
@@ -224,14 +231,22 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
-     * Inicia una sesión de captura de datos de duración determinada (5s).
+     * Inicia una sesión de captura de datos de duración determinada (3 s).
      */
     fun startCaptureSession(location: Location? = null) {
-        if (_uiState.value.isCapturing) return
-        Log.d("AnalyzerViewModel", "Captura iniciada. Lat: ${location?.latitude}")
+        if (_uiState.value.isCapturing || _uiState.value.isSaving) return
+        val captureLocation = location ?: run {
+            _uiState.update {
+                it.copy(captureFeedback = "Se necesita una ubicación válida para guardar la muestra")
+            }
+            return
+        }
+        Log.d("AnalyzerViewModel", "Captura iniciada. Lat: ${captureLocation.latitude}")
         
         viewModelScope.launch {
-            _uiState.update { it.copy(isCapturing = true, captureProgress = 0f) }
+            _uiState.update {
+                it.copy(isCapturing = true, captureProgress = 0f, captureFeedback = null)
+            }
             isCaptureActive = true
             captureStartTime = System.currentTimeMillis()
             resetCaptureAccumulators()
@@ -241,46 +256,75 @@ class AnalyzerViewModel(application: Application) : AndroidViewModel(application
                 _uiState.update { it.copy(captureProgress = elapsed.toFloat() / CAPTURE_DURATION_MS) }
                 delay(100)
             }
-            finalizeCapture(location)
+            finalizeCapture(captureLocation)
         }
     }
 
     /**
      * Finaliza la sesión de captura y persiste los resultados en la base de datos.
      */
-    private fun finalizeCapture(location: Location?) {
+    private fun finalizeCapture(location: Location) {
         isCaptureActive = false
-        val avgDb = if (captureCount > 0) captureDbSum / captureCount else 0.0
-        val finalSpectrum = captureSpectrumSum?.map { it / captureCount }?.toFloatArray() ?: FloatArray(0)
+        val avgDb = if (captureCount > 0 && captureDbEnergySum > 0.0) {
+            DecibelMath.energyToDb(captureDbEnergySum / captureCount)
+        } else {
+            0.0
+        }
+        val finalSpectrum = if (captureCount > 0) {
+            captureSpectrumEnergySum?.map { energySum ->
+                if (energySum > 0.0) {
+                    DecibelMath.energyToDb(energySum / captureCount, -20.0).toFloat()
+                } else {
+                    -20f
+                }
+            }?.toFloatArray() ?: FloatArray(0)
+        } else {
+            FloatArray(0)
+        }
         
         val dominantFreq = ThirdOctaveCalculator.dominantFrequency(finalSpectrum, SAMPLE_RATE, currentBufferSize)
 
         val thirdOctaveBands = ThirdOctaveCalculator.calculateBands(finalSpectrum, SAMPLE_RATE, currentBufferSize)
 
+        _uiState.update { it.copy(isCapturing = false, captureProgress = 0f, isSaving = true) }
+
         viewModelScope.launch(Dispatchers.IO) {
             val state = _uiState.value
             val labels = synchronized(captureYAMNetLabels) { captureYAMNetLabels.toMap() }
 
-            repository.saveCompleteAudioSample(
+            val result = repository.saveCompleteAudioSample(
                 avgDb = avgDb.toFloat(),
                 peakDb = captureMaxDb.toFloat(),
-                latitude = location?.latitude,
-                longitude = location?.longitude,
+                latitude = location.latitude,
+                longitude = location.longitude,
                 spectralEnergy = thirdOctaveBands,
                 labels = labels,
                 dominantFreq = dominantFreq,
                 weighting = state.selectedWeighting.name
             )
+
+            _uiState.update {
+                it.copy(
+                    isSaving = false,
+                    captureFeedback = result.fold(
+                        onSuccess = { "Muestra guardada correctamente" },
+                        onFailure = { error ->
+                            "No se pudo guardar la muestra: " +
+                                (error.localizedMessage ?: "error desconocido")
+                        }
+                    )
+                )
+            }
+            delay(3_500)
+            _uiState.update { it.copy(captureFeedback = null) }
         }
-        
-        _uiState.update { it.copy(isCapturing = false, captureProgress = 0f) }
     }
 
     private fun resetCaptureAccumulators() {
-        captureDbSum = 0.0
+        captureDbEnergySum = 0.0
         captureCount = 0
         captureMaxDb = -100.0
-        captureSpectrumSum = null
+        captureSpectrumEnergySum = null
         synchronized(captureYAMNetLabels) {
             captureYAMNetLabels.clear()
         }

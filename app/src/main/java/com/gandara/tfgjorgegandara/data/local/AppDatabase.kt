@@ -15,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SoundClassification::class
     ], 
     version = 6,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
 
@@ -36,14 +36,13 @@ abstract class AppDatabase : RoomDatabase() {
                     "noise_map_database"
                 )
                 .addMigrations(MIGRATION_5_6)
-                .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance
                 instance
             }
         }
 
-        private val MIGRATION_5_6 = object : Migration(5, 6) {
+        val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE audio_samples ADD COLUMN aiExplanation TEXT")
             }

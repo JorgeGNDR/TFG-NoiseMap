@@ -174,10 +174,10 @@ private fun InfoLine(title: String, body: String) {
 
 private fun bufferSizeDescription(bufferSize: Int): String {
     return when (bufferSize) {
-        1024 -> "Respuesta muy rapida y baja latencia, con menos detalle espectral y graves menos precisos."
-        2048 -> "Respuesta mas rapida y visualizacion mas agil, con menos precision en bajas frecuencias."
+        1024 -> "Respuesta muy rápida y baja latencia, con menos detalle espectral y graves menos precisos."
+        2048 -> "Respuesta más rápida y visualización más ágil, con menos precisión en bajas frecuencias."
         4096 -> "Equilibrio recomendado entre fluidez y detalle espectral."
-        8192 -> "Mayor detalle en frecuencia, especialmente en graves, con respuesta visual mas lenta."
-        else -> "Tamanho de buffer personalizado."
+        8192 -> "Mayor detalle en frecuencia, especialmente en graves, con respuesta visual más lenta."
+        else -> "Tamaño de buffer personalizado."
     }
 }
