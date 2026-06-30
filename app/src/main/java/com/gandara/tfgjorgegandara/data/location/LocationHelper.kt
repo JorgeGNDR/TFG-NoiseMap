@@ -4,10 +4,11 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
-import android.location.Location
 import android.os.Looper
 import android.util.Log
 import androidx.core.content.ContextCompat
+import com.gandara.tfgjorgegandara.domain.location.GeoLocation
+import com.gandara.tfgjorgegandara.domain.location.LocationTracker
 import com.google.android.gms.location.*
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -17,7 +18,7 @@ import java.util.concurrent.TimeUnit
 /**
  * Clase de utilidad para interactuar con la API de Google Play Services Fused Location Provider.
  */
-class LocationHelper(private val context: Context) {
+class LocationHelper(private val context: Context) : LocationTracker {
 
     private val fusedLocationClient: FusedLocationProviderClient =
         LocationServices.getFusedLocationProviderClient(context)
@@ -44,11 +45,11 @@ class LocationHelper(private val context: Context) {
      * Expone un flujo de actualizaciones de ubicación utilizando callbackFlow.
      */
     @SuppressLint("MissingPermission")
-    fun getLocationUpdates(intervalInSeconds: Long = 5): Flow<Location?> = callbackFlow {
+    override fun updates(intervalInSeconds: Long): Flow<GeoLocation?> = callbackFlow {
         val callback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
                 val location = result.lastLocation
-                location?.let { trySend(it) }
+                location?.let { trySend(GeoLocation(it.latitude, it.longitude)) }
             }
             override fun onLocationAvailability(availability: LocationAvailability) {
                 Log.d("LocationHelper", "Disponibilidad del sensor GPS: ${availability.isLocationAvailable}")
@@ -77,7 +78,7 @@ class LocationHelper(private val context: Context) {
      * Realiza una solicitud única para obtener la ubicación actual con alta prioridad.
      */
     @SuppressLint("MissingPermission")
-    fun getCurrentLocation(onResult: (Location?) -> Unit) {
+    override fun getCurrentLocation(onResult: (GeoLocation?) -> Unit) {
         val priority = if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             Priority.PRIORITY_HIGH_ACCURACY
         } else {
@@ -91,7 +92,7 @@ class LocationHelper(private val context: Context) {
                 .build(),
             null
         ).addOnSuccessListener { location ->
-            onResult(location)
+            onResult(location?.let { GeoLocation(it.latitude, it.longitude) })
         }.addOnFailureListener { e ->
             Log.e("LocationHelper", "No se pudo obtener la ubicación actual: ${e.message}")
             onResult(null)
@@ -102,9 +103,9 @@ class LocationHelper(private val context: Context) {
      * Recupera de forma inmediata la última ubicación registrada por el sistema (caché).
      */
     @SuppressLint("MissingPermission")
-    fun getLastLocation(onResult: (Location?) -> Unit) {
+    override fun getLastLocation(onResult: (GeoLocation?) -> Unit) {
         fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-            onResult(location)
+            onResult(location?.let { GeoLocation(it.latitude, it.longitude) })
         }
     }
 }

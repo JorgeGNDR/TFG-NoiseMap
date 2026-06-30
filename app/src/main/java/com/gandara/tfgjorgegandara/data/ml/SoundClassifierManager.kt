@@ -2,6 +2,8 @@
 
 import android.content.Context
 import android.util.Log
+import com.gandara.tfgjorgegandara.domain.audio.SoundClassificationResult
+import com.gandara.tfgjorgegandara.domain.audio.SoundClassifier
 import org.tensorflow.lite.task.audio.classifier.AudioClassifier
 import org.tensorflow.lite.support.audio.TensorAudio
 import org.tensorflow.lite.task.core.BaseOptions
@@ -10,7 +12,7 @@ import org.tensorflow.lite.task.core.BaseOptions
  * Gestor del motor de inferencia TensorFlow Lite para la clasificación de sonidos ambientales.
  * Utiliza el modelo pre-entrenado YAMNet.
  */
-class SoundClassifierManager(context: Context) {
+class SoundClassifierManager(context: Context) : SoundClassifier {
     private var classifier: AudioClassifier? = null
     private var tensorAudio: TensorAudio? = null
     private var resampler: StreamingLinearResampler? = null
@@ -24,14 +26,6 @@ class SoundClassifierManager(context: Context) {
     companion object {
         private const val TAG = "SoundClassifierManager"
         private const val MODEL_PATH = "yamnet.tflite"
-    }
-
-    data class ClassificationResult(
-        val label: String,
-        val probability: Float? = null
-    ) {
-        val displayText: String
-            get() = probability?.let { "$label (${(it * 100).toInt()}%)" } ?: label
     }
 
     init {
@@ -63,7 +57,7 @@ class SoundClassifierManager(context: Context) {
      * Recibe el mismo audio capturado para el analizador y conserva la última
      * ventana requerida por YAMNet, remuestreada a la frecuencia del modelo.
      */
-    fun offerAudio(samples: ShortArray, sampleRate: Int) {
+    override fun offerAudio(samples: ShortArray, sampleRate: Int) {
         val currentClassifier = classifier ?: return
         if (inputWindow.isEmpty()) return
 
@@ -93,12 +87,12 @@ class SoundClassifierManager(context: Context) {
     /**
      * Clasifica la última ventana completa recibida desde la captura compartida.
      */
-    fun classifyContinuous(): ClassificationResult {
-        val currentClassifier = classifier ?: return ClassificationResult("Inicializando...")
-        val currentTensor = tensorAudio ?: return ClassificationResult("Cargando...")
+    override fun classifyLatest(): SoundClassificationResult {
+        val currentClassifier = classifier ?: return SoundClassificationResult("Inicializando...")
+        val currentTensor = tensorAudio ?: return SoundClassificationResult("Cargando...")
 
         val latestWindow = synchronized(audioBufferLock) {
-            if (collectedSamples < inputWindow.size) return ClassificationResult("Analizando...")
+            if (collectedSamples < inputWindow.size) return SoundClassificationResult("Analizando...")
 
             FloatArray(inputWindow.size) { index ->
                 inputWindow[(inputWriteIndex + index) % inputWindow.size]
@@ -113,22 +107,22 @@ class SoundClassifierManager(context: Context) {
             val topCategory = results.firstOrNull()?.categories?.firstOrNull()
 
             if (topCategory != null && topCategory.score > 0.3f) {
-                ClassificationResult(
+                SoundClassificationResult(
                     label = topCategory.label,
                     probability = topCategory.score
                 )
             } else {
-                ClassificationResult("Analizando...")
+                SoundClassificationResult("Analizando...")
             }
         } catch (e: Exception) {
-            ClassificationResult("Error al leer datos del micrófono. Comprueba permisos")
+            SoundClassificationResult("Error al leer datos del micrófono. Comprueba permisos")
         }
     }
 
     /**
      * Libera los recursos del motor de inferencia y la captura de audio.
      */
-    fun close() {
+    override fun close() {
         try {
             classifier?.close()
         } catch (e: Exception) {

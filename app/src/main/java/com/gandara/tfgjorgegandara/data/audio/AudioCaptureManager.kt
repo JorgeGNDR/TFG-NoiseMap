@@ -5,6 +5,7 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.util.Log
+import com.gandara.tfgjorgegandara.domain.audio.AudioCaptureSource
 import kotlinx.coroutines.*
 import kotlin.math.log10
 import kotlin.math.max
@@ -14,7 +15,7 @@ import kotlin.math.sqrt
  * Gestor de la captura de audio crudo desde el hardware del dispositivo.
  * Se encarga de la configuración del buffer y la ejecución del hilo de lectura.
  */
-class AudioCaptureManager(private val fftSize: Int = 4096) {
+class AudioCaptureManager(private val fftSize: Int = 4096) : AudioCaptureSource {
     private val sampleRate = 44100
     private val channelConfig = AudioFormat.CHANNEL_IN_MONO
     private val audioFormat = AudioFormat.ENCODING_PCM_16BIT
@@ -82,6 +83,14 @@ class AudioCaptureManager(private val fftSize: Int = 4096) {
             Log.e("AudioCaptureManager", "Fallo al liberar AudioRecord: ${e.message}")
         }
         audioRecord = null
+    }
+
+    override fun start(onAudioData: (ShortArray) -> Unit) {
+        startRecording { samples, _ -> onAudioData(samples) }
+    }
+
+    override fun stop() {
+        stopRecording()
     }
 
     /**

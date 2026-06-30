@@ -2,9 +2,9 @@ package com.gandara.tfgjorgegandara
 
 import com.gandara.tfgjorgegandara.data.ml.StreamingLinearResampler
 import com.gandara.tfgjorgegandara.domain.model.ThirdOctaveBands
-import com.gandara.tfgjorgegandara.dsp.DecibelMath
-import com.gandara.tfgjorgegandara.dsp.FFTCalculator
-import com.gandara.tfgjorgegandara.dsp.ThirdOctaveCalculator
+import com.gandara.tfgjorgegandara.domain.audio.DecibelMath
+import com.gandara.tfgjorgegandara.domain.audio.FFTCalculator
+import com.gandara.tfgjorgegandara.domain.audio.ThirdOctaveCalculator
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

@@ -32,14 +32,14 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.gandara.tfgjorgegandara.data.settings.AppSettings
-import com.gandara.tfgjorgegandara.ui.analyzer.AnalyzerScreen
-import com.gandara.tfgjorgegandara.ui.common.LocationViewModel
-import com.gandara.tfgjorgegandara.ui.history.HistoryScreen
-import com.gandara.tfgjorgegandara.ui.history.HistoryViewModel
-import com.gandara.tfgjorgegandara.ui.map.MapScreen
-import com.gandara.tfgjorgegandara.ui.settings.SettingsScreen
-import com.gandara.tfgjorgegandara.ui.theme.NoiseMapTheme
+import com.gandara.tfgjorgegandara.di.AppContainer
+import com.gandara.tfgjorgegandara.presentation.analyzer.AnalyzerScreen
+import com.gandara.tfgjorgegandara.presentation.common.LocationViewModel
+import com.gandara.tfgjorgegandara.presentation.history.HistoryScreen
+import com.gandara.tfgjorgegandara.presentation.history.HistoryViewModel
+import com.gandara.tfgjorgegandara.presentation.map.MapScreen
+import com.gandara.tfgjorgegandara.presentation.settings.SettingsRoute
+import com.gandara.tfgjorgegandara.presentation.theme.NoiseMapTheme
 import org.maplibre.android.MapLibre
 
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
@@ -55,7 +55,7 @@ class MainActivity : ComponentActivity() {
 
         // Inicializa MapLibre y Configuración
         MapLibre.getInstance(this)
-        AppSettings.init(this)
+        AppContainer.settings(this)
 
         setContent {
             NoiseMapTheme {
@@ -179,7 +179,7 @@ class MainActivity : ComponentActivity() {
                                 HistoryScreen(viewModel = historyViewModel)
                             }
                             composable(Screen.Settings.route) {
-                                SettingsScreen()
+                                SettingsRoute()
                             }
                         }
                     } else {
