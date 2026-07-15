@@ -7,9 +7,7 @@ import android.media.MediaRecorder
 import android.util.Log
 import com.gandara.tfgjorgegandara.domain.audio.AudioCaptureSource
 import kotlinx.coroutines.*
-import kotlin.math.log10
 import kotlin.math.max
-import kotlin.math.sqrt
 
 /**
  * Gestor de la captura de audio crudo desde el hardware del dispositivo.
@@ -25,15 +23,12 @@ class AudioCaptureManager(private val fftSize: Int = 4096) : AudioCaptureSource 
 
     private var audioRecord: AudioRecord? = null
     private var isRecording = false
-    var offset = 100.0
 
     private var captureJob: Job? = null
     private val captureScope = CoroutineScope(Dispatchers.IO)
 
-    // Inicia la captura de audio
-
     @SuppressLint("MissingPermission")
-    fun startRecording(onDataReady: (ShortArray, Double) -> Unit) {
+    fun startRecording(onDataReady: (ShortArray) -> Unit) {
         if (isRecording) return
 
         try {
@@ -58,8 +53,7 @@ class AudioCaptureManager(private val fftSize: Int = 4096) : AudioCaptureSource 
                 while (isActive && isRecording) {
                     val samplesRead = audioRecord?.read(dataBuffer, 0, dataBuffer.size) ?: 0
                     if (samplesRead == dataBuffer.size) {
-                        val db = calculateDb(dataBuffer)
-                        onDataReady(dataBuffer.clone(), db)
+                        onDataReady(dataBuffer.clone())
                     }
                 }
             }
@@ -86,32 +80,10 @@ class AudioCaptureManager(private val fftSize: Int = 4096) : AudioCaptureSource 
     }
 
     override fun start(onAudioData: (ShortArray) -> Unit) {
-        startRecording { samples, _ -> onAudioData(samples) }
+        startRecording { samples -> onAudioData(samples) }
     }
 
     override fun stop() {
         stopRecording()
-    }
-
-    /**
-     * Calcula el nivel de presión sonora (dB SPL aproximado) utilizando el valor RMS de las muestras.
-     */
-    private fun calculateDb(samples: ShortArray): Double {
-        var sumOfSquares = 0.0
-        for (sample in samples) {
-            // Normalización de la muestra de 16 bits al rango [-1.0, 1.0]
-            val normalized = sample / 32768.0
-            sumOfSquares += normalized * normalized
-        }
-        
-        // Root Mean Square (Valor Eficaz)
-        val rms = sqrt(sumOfSquares / samples.size)
-
-        // Conversión a escala logarítmica (decibelios) aplicando el offset de calibración
-        return if (rms > 1e-9) {
-            20 * log10(rms) + offset
-        } else {
-            0.0
-        }
     }
 }

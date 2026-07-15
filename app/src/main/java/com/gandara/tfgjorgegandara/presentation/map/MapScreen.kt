@@ -1,16 +1,47 @@
 package com.gandara.tfgjorgegandara.presentation.map
 
 import android.Manifest
+import android.app.DatePickerDialog
 import android.content.Context
 import android.content.pm.PackageManager
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,10 +53,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import com.gandara.tfgjorgegandara.BuildConfig
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.gandara.tfgjorgegandara.BuildConfig
 import com.gandara.tfgjorgegandara.domain.model.ThirdOctaveBands
 import com.gandara.tfgjorgegandara.presentation.common.LocationViewModel
 import kotlinx.coroutines.Dispatchers
@@ -42,11 +73,10 @@ import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.Point
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
-/**
- * Pantalla del mapa profesional utilizando MapLibre GL.
- * Visualiza datos acusticos mediante capas de calor vectoriales de alto rendimiento.
- */
 @Composable
 fun MapScreen(
     onNavigateBack: () -> Unit,
@@ -60,7 +90,8 @@ fun MapScreen(
     val isLoading by mapViewModel.isLoading.collectAsState()
     val errorMessage by mapViewModel.errorMessage.collectAsState()
     val selectedBandIndex by mapViewModel.selectedBandIndex.collectAsState()
-    val selectedTimeRange by mapViewModel.selectedTimeRange.collectAsState()
+    val dateFilter by mapViewModel.dateFilter.collectAsState()
+    val hourFilter by mapViewModel.hourFilter.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(errorMessage) {
@@ -76,8 +107,8 @@ fun MapScreen(
 
     val mapView = remember { MapView(context) }
     var mapLibreMap by remember { mutableStateOf<org.maplibre.android.maps.MapLibreMap?>(null) }
-
     var hasCenteredInitially by remember { mutableStateOf(false) }
+
     LaunchedEffect(currentLocation, mapLibreMap) {
         val map = mapLibreMap
         val loc = currentLocation
@@ -178,8 +209,15 @@ fun MapScreen(
         FrequencySlicerCard(
             selectedIndex = selectedBandIndex,
             onIndexChange = { mapViewModel.setFrequencyBandIndex(it) },
-            selectedTimeRange = selectedTimeRange,
-            onTimeRangeChange = { mapViewModel.setTimeRange(it) },
+            dateFilter = dateFilter,
+            onDateFilterModeChange = { mapViewModel.setDateFilterMode(it) },
+            onSingleDateChange = { mapViewModel.setSingleDate(it) },
+            onRangeStartDateChange = { mapViewModel.setRangeStartDate(it) },
+            onRangeEndDateChange = { mapViewModel.setRangeEndDate(it) },
+            hourFilter = hourFilter,
+            onAllDayChange = { mapViewModel.setAllDayFilter(it) },
+            onStartHourChange = { mapViewModel.setStartHour(it) },
+            onEndHourChange = { mapViewModel.setEndHour(it) },
             onLocateClick = {
                 currentLocation?.let {
                     mapLibreMap?.animateCamera(
@@ -209,9 +247,6 @@ fun MapScreen(
     }
 }
 
-/**
- * Configura la capa de calor de MapLibre.
- */
 private fun setupHeatmapLayer(style: Style) {
     val source = GeoJsonSource("noise-source")
     style.addSource(source)
@@ -255,19 +290,26 @@ private fun setupHeatmapLayer(style: Style) {
 fun FrequencySlicerCard(
     selectedIndex: Int,
     onIndexChange: (Int) -> Unit,
-    selectedTimeRange: Int,
-    onTimeRangeChange: (Int) -> Unit,
+    dateFilter: MapViewModel.DateFilter,
+    onDateFilterModeChange: (MapViewModel.DateFilterMode) -> Unit,
+    onSingleDateChange: (Long) -> Unit,
+    onRangeStartDateChange: (Long) -> Unit,
+    onRangeEndDateChange: (Long) -> Unit,
+    hourFilter: MapViewModel.HourFilter,
+    onAllDayChange: (Boolean) -> Unit,
+    onStartHourChange: (Int) -> Unit,
+    onEndHourChange: (Int) -> Unit,
     onLocateClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)),
-        shape = RoundedCornerShape(8.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)),
+        shape = RoundedCornerShape(10.dp)
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -282,11 +324,6 @@ fun FrequencySlicerCard(
                     color = MaterialTheme.colorScheme.primary
                 )
 
-                TimeRangeDropdown(
-                    selectedTimeRange = selectedTimeRange,
-                    onTimeRangeChange = onTimeRangeChange
-                )
-
                 FilledIconButton(
                     onClick = onLocateClick,
                     modifier = Modifier
@@ -297,7 +334,7 @@ fun FrequencySlicerCard(
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 ) {
-                    Icon(Icons.Default.LocationOn, contentDescription = "Ubicacion actual")
+                    Icon(Icons.Default.LocationOn, contentDescription = "Ubicación actual")
                 }
             }
 
@@ -318,61 +355,257 @@ fun FrequencySlicerCard(
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Global", style = MaterialTheme.typography.labelSmall)
-                Text("1kHz", style = MaterialTheme.typography.labelSmall)
-                Text("16kHz", style = MaterialTheme.typography.labelSmall)
+                Text("1 kHz", style = MaterialTheme.typography.labelSmall)
+                Text("16 kHz", style = MaterialTheme.typography.labelSmall)
             }
+
+            MapFilterControls(
+                dateFilter = dateFilter,
+                onDateFilterModeChange = onDateFilterModeChange,
+                onSingleDateChange = onSingleDateChange,
+                onRangeStartDateChange = onRangeStartDateChange,
+                onRangeEndDateChange = onRangeEndDateChange,
+                hourFilter = hourFilter,
+                onAllDayChange = onAllDayChange,
+                onStartHourChange = onStartHourChange,
+                onEndHourChange = onEndHourChange
+            )
         }
     }
 }
 
 @Composable
-private fun TimeRangeDropdown(
-    selectedTimeRange: Int,
-    onTimeRangeChange: (Int) -> Unit
+private fun MapFilterControls(
+    dateFilter: MapViewModel.DateFilter,
+    onDateFilterModeChange: (MapViewModel.DateFilterMode) -> Unit,
+    onSingleDateChange: (Long) -> Unit,
+    onRangeStartDateChange: (Long) -> Unit,
+    onRangeEndDateChange: (Long) -> Unit,
+    hourFilter: MapViewModel.HourFilter,
+    onAllDayChange: (Boolean) -> Unit,
+    onStartHourChange: (Int) -> Unit,
+    onEndHourChange: (Int) -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    val options = listOf(
-        24 to "24h",
-        24 * 7 to "7d",
-        24 * 30 to "30d",
-        -1 to "Todo"
+    val context = LocalContext.current
+    val dateModeOptions = MapViewModel.DateFilterMode.entries.map { mode ->
+        FilterOption(mode, mode.label)
+    }
+    val hourModeOptions = listOf(
+        FilterOption(true, "Todo el día"),
+        FilterOption(false, "Horario personalizado")
     )
-    val selectedLabel = options.firstOrNull { it.first == selectedTimeRange }?.second ?: "24h"
+    val startHourOptions = (0..23).map { FilterOption(it, it.toHourLabel()) }
+    val endHourOptions = (1..24).map { FilterOption(it, it.toHourLabel()) }
 
-    Box {
-        TextButton(
-            onClick = { expanded = true },
-            modifier = Modifier.height(32.dp),
-            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
+    fun showDatePicker(initialDateMillis: Long, onDateSelected: (Long) -> Unit) {
+        val calendar = Calendar.getInstance().apply { timeInMillis = initialDateMillis }
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                val selectedDate = Calendar.getInstance().apply {
+                    clear()
+                    set(year, month, dayOfMonth, 0, 0, 0)
+                }.timeInMillis
+                onDateSelected(selectedDate)
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = "Filtros del mapa",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(selectedLabel)
-            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+            FilterDropdown(
+                label = "Periodo",
+                selectedText = dateFilter.label,
+                options = dateModeOptions,
+                onOptionSelected = onDateFilterModeChange,
+                modifier = Modifier.weight(1f)
+            )
+
+            FilterDropdown(
+                label = "Horario",
+                selectedText = if (hourFilter.allDay) "Todo el día" else hourFilter.label,
+                options = hourModeOptions,
+                onOptionSelected = onAllDayChange,
+                modifier = Modifier.weight(1f)
+            )
         }
 
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            options.forEach { (hours, label) ->
-                DropdownMenuItem(
-                    text = { Text(label) },
-                    onClick = {
-                        expanded = false
-                        onTimeRangeChange(hours)
-                    }
+        when (dateFilter.mode) {
+            MapViewModel.DateFilterMode.SINGLE_DAY -> {
+                DateField(
+                    label = "Fecha",
+                    selectedText = dateFilter.singleDayMillis.formatDate(),
+                    onClick = { showDatePicker(dateFilter.singleDayMillis, onSingleDateChange) }
+                )
+            }
+
+            MapViewModel.DateFilterMode.DATE_RANGE -> {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    DateField(
+                        label = "Desde",
+                        selectedText = dateFilter.rangeStartMillis.formatDate(),
+                        onClick = { showDatePicker(dateFilter.rangeStartMillis, onRangeStartDateChange) },
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    DateField(
+                        label = "Hasta",
+                        selectedText = dateFilter.rangeEndMillis.formatDate(),
+                        onClick = { showDatePicker(dateFilter.rangeEndMillis, onRangeEndDateChange) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            else -> Unit
+        }
+
+        if (!hourFilter.allDay) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterDropdown(
+                    label = "Desde",
+                    selectedText = hourFilter.startHour.toHourLabel(),
+                    options = startHourOptions,
+                    onOptionSelected = onStartHourChange,
+                    modifier = Modifier.weight(1f)
+                )
+
+                FilterDropdown(
+                    label = "Hasta",
+                    selectedText = hourFilter.endHour.toHourLabel(),
+                    options = endHourOptions,
+                    onOptionSelected = onEndHourChange,
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
     }
 }
 
+@Composable
+private fun DateField(
+    label: String,
+    selectedText: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        OutlinedButton(
+            onClick = onClick,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(38.dp),
+            shape = RoundedCornerShape(6.dp),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+        ) {
+            Text(
+                text = selectedText,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                style = MaterialTheme.typography.labelMedium
+            )
+        }
+    }
+}
+
+@Composable
+private fun <T> FilterDropdown(
+    label: String,
+    selectedText: String,
+    options: List<FilterOption<T>>,
+    onOptionSelected: (T) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Column(modifier = modifier) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Box {
+            OutlinedButton(
+                onClick = { expanded = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(38.dp),
+                shape = RoundedCornerShape(6.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+            ) {
+                Text(
+                    text = selectedText,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    style = MaterialTheme.typography.labelMedium
+                )
+                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+            }
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                options.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option.label) },
+                        onClick = {
+                            expanded = false
+                            onOptionSelected(option.value)
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+private data class FilterOption<T>(
+    val value: T,
+    val label: String
+)
+
 private fun frequencyLabel(selectedIndex: Int): String {
     return if (selectedIndex == -1) {
-        "Nivel Global"
+        "Nivel global"
     } else {
         "${ThirdOctaveBands.CENTER_FREQUENCIES_HZ[selectedIndex].toInt()} Hz"
     }
 }
+
+private fun Long.formatDate(): String {
+    return SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(this)
+}
+
+private fun Int.toHourLabel(): String = if (this == 24) "24:00" else "%02d:00".format(this)
 
 private fun Context.hasLocationPermission(): Boolean {
     val fineLocationGranted = ContextCompat.checkSelfPermission(

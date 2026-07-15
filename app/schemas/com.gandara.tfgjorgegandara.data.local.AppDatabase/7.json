@@ -1,0 +1,221 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 7,
+    "identityHash": "273179bf5915cafc975f2fd066ad73ef",
+    "entities": [
+      {
+        "tableName": "audio_samples",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `timestamp` INTEGER NOT NULL, `latitude` REAL NOT NULL, `longitude` REAL NOT NULL, `avgDb` REAL NOT NULL, `peakDb` REAL NOT NULL, `dominantFreq` REAL NOT NULL, `weighting` TEXT NOT NULL, `aiExplanation` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "latitude",
+            "columnName": "latitude",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "longitude",
+            "columnName": "longitude",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "avgDb",
+            "columnName": "avgDb",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "peakDb",
+            "columnName": "peakDb",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dominantFreq",
+            "columnName": "dominantFreq",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "weighting",
+            "columnName": "weighting",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "aiExplanation",
+            "columnName": "aiExplanation",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_audio_samples_timestamp",
+            "unique": false,
+            "columnNames": [
+              "timestamp"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_audio_samples_timestamp` ON `${TABLE_NAME}` (`timestamp`)"
+          },
+          {
+            "name": "index_audio_samples_latitude_longitude",
+            "unique": false,
+            "columnNames": [
+              "latitude",
+              "longitude"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_audio_samples_latitude_longitude` ON `${TABLE_NAME}` (`latitude`, `longitude`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "frequency_bins",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`sampleId` INTEGER NOT NULL, `band` INTEGER NOT NULL, `energy` REAL NOT NULL, PRIMARY KEY(`sampleId`, `band`), FOREIGN KEY(`sampleId`) REFERENCES `audio_samples`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "sampleId",
+            "columnName": "sampleId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "band",
+            "columnName": "band",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "energy",
+            "columnName": "energy",
+            "affinity": "REAL",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "sampleId",
+            "band"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_frequency_bins_sampleId",
+            "unique": false,
+            "columnNames": [
+              "sampleId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_frequency_bins_sampleId` ON `${TABLE_NAME}` (`sampleId`)"
+          },
+          {
+            "name": "index_frequency_bins_band",
+            "unique": false,
+            "columnNames": [
+              "band"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_frequency_bins_band` ON `${TABLE_NAME}` (`band`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "audio_samples",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sampleId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "sound_classifications",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`sampleId` INTEGER NOT NULL, `label` TEXT NOT NULL, `probability` REAL NOT NULL, PRIMARY KEY(`sampleId`, `label`), FOREIGN KEY(`sampleId`) REFERENCES `audio_samples`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "sampleId",
+            "columnName": "sampleId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "label",
+            "columnName": "label",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "probability",
+            "columnName": "probability",
+            "affinity": "REAL",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "sampleId",
+            "label"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_sound_classifications_sampleId",
+            "unique": false,
+            "columnNames": [
+              "sampleId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_sound_classifications_sampleId` ON `${TABLE_NAME}` (`sampleId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "audio_samples",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sampleId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '273179bf5915cafc975f2fd066ad73ef')"
+    ]
+  }
+}

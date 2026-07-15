@@ -44,13 +44,16 @@ class RoomHistoryRepository(
 private fun AudioSample.toDomain(): AudioSampleRecord {
     return AudioSampleRecord(
         id = id,
+        sessionId = sessionId,
         timestamp = timestamp,
+        durationMs = durationMs,
         latitude = latitude,
         longitude = longitude,
         avgDb = avgDb,
         peakDb = peakDb,
         dominantFreq = dominantFreq,
         weighting = weighting,
+        calibrationOffset = calibrationOffset,
         aiExplanation = aiExplanation
     )
 }
@@ -58,13 +61,16 @@ private fun AudioSample.toDomain(): AudioSampleRecord {
 private fun AudioSampleRecord.toEntity(): AudioSample {
     return AudioSample(
         id = id,
+        sessionId = sessionId,
         timestamp = timestamp,
+        durationMs = durationMs,
         latitude = latitude,
         longitude = longitude,
         avgDb = avgDb,
         peakDb = peakDb,
         dominantFreq = dominantFreq,
         weighting = weighting,
+        calibrationOffset = calibrationOffset,
         aiExplanation = aiExplanation
     )
 }

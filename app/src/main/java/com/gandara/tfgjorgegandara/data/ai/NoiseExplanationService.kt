@@ -38,7 +38,7 @@ class NoiseExplanationService : NoiseExplanationRepository {
         }
 
         responseText.ifBlank {
-            "No se ha podido generar una explicacion para esta muestra."
+            "No se ha podido generar una explicación para esta muestra."
         }
     }
 
@@ -80,9 +80,9 @@ class NoiseExplanationService : NoiseExplanationRepository {
             Explica esta medición de ruido ambiental para una persona sin conocimientos de audio.
             Responde en español, en 3 frases breves, sin listas y sin tecnicismos innecesarios.
 
-            Datos: nivel medio ${"%.1f".format(sample.avgDb)} dB(${sample.weighting}), pico ${"%.1f".format(sample.peakDb)} dB, frecuencia dominante ${sample.dominantFreq.toInt()} Hz, sonidos detectados: $labels, bandas con mas energia: $strongestBands.
+            Datos: nivel medio ${"%.1f".format(sample.avgDb)} dB(${sample.weighting}), pico ${"%.1f".format(sample.peakDb)} dB, frecuencia dominante ${sample.dominantFreq.toInt()} Hz, sonidos detectados: $labels, bandas con más energía: $strongestBands.
 
-            Indica si parece bajo, moderado o elevado, que podria causarlo, que significa para el usuario y sus consecuencias a largo plazo.
+            Indica si parece bajo, moderado o elevado, qué podría causarlo y qué podría implicar para el usuario si la exposición a niveles similares se mantiene en el tiempo.
         """.trimIndent()
     }
 }

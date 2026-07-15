@@ -35,24 +35,25 @@ interface AudioSampleDao {
 
     @Query("""
         SELECT
-            AVG(latitude) as lat,
-            AVG(longitude) as lon,
-            AVG(avgDb) as avgDb
+            timestamp,
+            latitude,
+            longitude,
+            avgDb
         FROM audio_samples
-        WHERE timestamp >= :sinceTimestamp
+        WHERE timestamp BETWEEN :startTimestamp AND :endTimestamp
         AND latitude != 0.0
         AND longitude != 0.0
         AND latitude BETWEEN :minLat AND :maxLat
         AND longitude BETWEEN :minLon AND :maxLon
-        GROUP BY CAST(latitude * 10000 AS INTEGER), CAST(longitude * 10000 AS INTEGER)
     """)
-    suspend fun getAverageDbByLocationTile(
-        sinceTimestamp: Long,
+    suspend fun getSamplesForHeatmap(
+        startTimestamp: Long,
+        endTimestamp: Long,
         minLat: Double,
         maxLat: Double,
         minLon: Double,
         maxLon: Double
-    ): List<TileDbResult>
+    ): List<HeatmapSampleRow>
 
     @Query("UPDATE audio_samples SET aiExplanation = :explanation WHERE id = :sampleId")
     suspend fun updateAiExplanation(sampleId: Long, explanation: String)
@@ -60,9 +61,10 @@ interface AudioSampleDao {
     @androidx.room.Delete
     suspend fun deleteSample(sample: AudioSample)
 
-    data class TileDbResult(
-        val lat: Double,
-        val lon: Double,
+    data class HeatmapSampleRow(
+        val timestamp: Long,
+        val latitude: Double,
+        val longitude: Double,
         val avgDb: Double
     )
 }

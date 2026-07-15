@@ -18,6 +18,8 @@ import com.gandara.tfgjorgegandara.domain.repository.NoiseExplanationRepository
 import com.gandara.tfgjorgegandara.domain.settings.SettingsRepository
 import com.gandara.tfgjorgegandara.domain.usecase.DeleteSampleUseCase
 import com.gandara.tfgjorgegandara.domain.usecase.ExplainSampleUseCase
+import com.gandara.tfgjorgegandara.domain.usecase.CreateMeasurementSessionUseCase
+import com.gandara.tfgjorgegandara.domain.usecase.FinishMeasurementSessionUseCase
 import com.gandara.tfgjorgegandara.domain.usecase.GetHeatmapDataUseCase
 import com.gandara.tfgjorgegandara.domain.usecase.GetSampleDetailsUseCase
 import com.gandara.tfgjorgegandara.domain.usecase.HistoryUseCases
@@ -43,6 +45,12 @@ object AppContainer {
     fun saveAudioSample(context: Context): SaveAudioSampleUseCase =
         SaveAudioSampleUseCase(audioRepository(context))
 
+    fun createMeasurementSession(context: Context): CreateMeasurementSessionUseCase =
+        CreateMeasurementSessionUseCase(audioRepository(context))
+
+    fun finishMeasurementSession(context: Context): FinishMeasurementSessionUseCase =
+        FinishMeasurementSessionUseCase(audioRepository(context))
+
     fun getHeatmapData(context: Context): GetHeatmapDataUseCase =
         GetHeatmapDataUseCase(audioRepository(context))
 
@@ -63,8 +71,8 @@ object AppContainer {
         val db = AppDatabase.getDatabase(context.applicationContext)
         return RoomAudioRepository(
             db,
+            db.measurementSessionDao(),
             db.audioSampleDao(),
-            db.geoTileDao(),
             db.frequencyBinDao(),
             db.soundClassificationDao()
         )

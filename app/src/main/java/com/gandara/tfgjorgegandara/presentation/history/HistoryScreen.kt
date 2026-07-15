@@ -18,7 +18,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 /**
- * Pantalla de historico que permite explorar las mediciones pasadas y sus metadatos detallados.
+ * Pantalla de histórico que permite explorar las mediciones pasadas y sus metadatos detallados.
  */
 @Composable
 fun HistoryScreen(viewModel: HistoryViewModel) {
@@ -75,7 +75,7 @@ fun HistoryScreen(viewModel: HistoryViewModel) {
     explanationError?.let { message ->
         AlertDialog(
             onDismissRequest = { viewModel.clearExplanationError() },
-            title = { Text("Explicacion no disponible") },
+            title = { Text("Explicación no disponible") },
             text = { Text(message) },
             confirmButton = {
                 TextButton(onClick = { viewModel.clearExplanationError() }) {
@@ -87,7 +87,7 @@ fun HistoryScreen(viewModel: HistoryViewModel) {
 }
 
 /**
- * Representacion visual de una medicion individual dentro del listado.
+ * Representación visual de una medición individual dentro del listado.
  */
 @Composable
 fun SampleItem(
@@ -127,7 +127,7 @@ fun SampleItem(
             AnimatedVisibility(visible = isSelected) {
                 Column(modifier = Modifier.padding(top = 8.dp)) {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                    Text("Ubicacion: ${sample.latitude}, ${sample.longitude}", style = MaterialTheme.typography.bodyMedium)
+                    Text("Ubicación: ${sample.latitude}, ${sample.longitude}", style = MaterialTheme.typography.bodyMedium)
                     Text("Nivel pico: ${"%.1f".format(sample.peakDb)} dB", style = MaterialTheme.typography.bodyMedium)
 
                     details?.let { data ->
@@ -145,7 +145,7 @@ fun SampleItem(
                         if (!explanation.isNullOrBlank()) {
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Explicacion IA",
+                                text = "Explicación IA",
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold
                             )
@@ -165,9 +165,9 @@ fun SampleItem(
                                 strokeWidth = 2.dp
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Generando explicacion...")
+                            Text("Generando explicación...")
                         } else {
-                            Text(if (sample.aiExplanation.isNullOrBlank()) "Explicar muestra" else "Actualizar explicacion")
+                            Text(if (sample.aiExplanation.isNullOrBlank()) "Explicar muestra" else "Actualizar explicación")
                         }
                     }
 

@@ -31,7 +31,7 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
         if (locationUpdatesJob?.isActive == true) return
         Log.d("LocationViewModel", "Iniciando servicio de geoposicionamiento...")
         
-        // Estrategia de recuperación rápida mediante caché
+        // Primera lectura a partir de la última ubicación disponible.
         locationTracker.getLastLocation { location ->
             location?.let { 
                 if (_currentLocation.value == null) {
@@ -40,7 +40,7 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
             }
         }
 
-        // Estrategia de recuperación forzada para mayor precisión inicial
+        // Solicitud puntual para actualizar la posición inicial.
         locationTracker.getCurrentLocation { location ->
             location?.let {
                 _currentLocation.value = it

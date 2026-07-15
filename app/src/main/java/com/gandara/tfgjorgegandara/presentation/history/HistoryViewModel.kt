@@ -82,7 +82,7 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
                 )
             } catch (e: Exception) {
                 val reason = e.localizedMessage ?: e.javaClass.simpleName
-                _explanationError.value = "No se pudo generar la explicacion: $reason"
+                _explanationError.value = "No se pudo generar la explicación: $reason"
             } finally {
                 _explainingSampleId.value = null
             }

@@ -9,7 +9,10 @@ data class HeatmapQuery(
     val maxLatitude: Double,
     val minLongitude: Double,
     val maxLongitude: Double,
-    val sinceHoursAgo: Int
+    val startTimestamp: Long,
+    val endTimestamp: Long,
+    val startHour: Int? = null,
+    val endHour: Int? = null
 )
 
 class GetHeatmapDataUseCase(
@@ -22,7 +25,10 @@ class GetHeatmapDataUseCase(
             maxLat = query.maxLatitude,
             minLon = query.minLongitude,
             maxLon = query.maxLongitude,
-            sinceHoursAgo = query.sinceHoursAgo
+            startTimestamp = query.startTimestamp,
+            endTimestamp = query.endTimestamp,
+            startHour = query.startHour,
+            endHour = query.endHour
         )
     }
 }

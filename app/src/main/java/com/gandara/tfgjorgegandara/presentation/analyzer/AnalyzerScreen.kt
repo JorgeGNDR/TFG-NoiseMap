@@ -3,7 +3,18 @@ package com.gandara.tfgjorgegandara.presentation.analyzer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -12,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,16 +38,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.gandara.tfgjorgegandara.presentation.common.LocationViewModel
-
 import com.gandara.tfgjorgegandara.R
 import com.gandara.tfgjorgegandara.domain.model.WeightingType
-import com.gandara.tfgjorgegandara.presentation.theme.*
+import com.gandara.tfgjorgegandara.presentation.common.LocationViewModel
+import com.gandara.tfgjorgegandara.presentation.theme.NeumorphicBackground
+import com.gandara.tfgjorgegandara.presentation.theme.PowerOrange
+import com.gandara.tfgjorgegandara.presentation.theme.TextDark
+import com.gandara.tfgjorgegandara.presentation.theme.TextGray
+import com.gandara.tfgjorgegandara.presentation.theme.neumorphic
 
 /**
  * Pantalla principal del analizador acústico.
- * Visualiza niveles de presión sonora (AVG, dB(), PEAK), espectro de frecuencias (logarítmico) e identificación de sonidos (YAMNET).
- * Botón de grabación de muestras, pausa, selector de ponderación
+ * Visualiza niveles de presión sonora, espectro de frecuencias y clasificación orientativa del sonido.
  */
 @Composable
 fun AnalyzerScreen(
@@ -48,6 +62,10 @@ fun AnalyzerScreen(
     val interactionSource = remember { MutableInteractionSource() }
     var showWeightingInfo by remember { mutableStateOf(false) }
 
+    LaunchedEffect(currentLocation) {
+        viewModel.updateCurrentLocation(currentLocation)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -56,7 +74,6 @@ fun AnalyzerScreen(
             .padding(top = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Indicadores de arriba (AVG, dB actual, PEAK)
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -89,15 +106,12 @@ fun AnalyzerScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Controles de configuración (Ponderación y Congelación de señal)
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Row(
                     modifier = Modifier
                         .height(44.dp)
@@ -162,7 +176,6 @@ fun AnalyzerScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Visualización del espectrograma en tiempo real
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -179,7 +192,6 @@ fun AnalyzerScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Panel de información de estado, clasificación y diagnóstico GPS
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -191,8 +203,8 @@ fun AnalyzerScreen(
         ) {
             Column {
                 val statusText = when {
-                    state.isCapturing -> "GRABANDO MUESTRA: ${(state.captureProgress * 100).toInt()}%"
-                    state.isSaving -> "GUARDANDO MUESTRA..."
+                    state.isCapturing -> "SESIÓN ACTIVA"
+                    state.isSaving -> "GUARDANDO DATOS..."
                     state.captureFeedback != null -> state.captureFeedback.orEmpty().uppercase()
                     state.isPaused -> "SEÑAL CONGELADA"
                     else -> state.detectedSound.ifEmpty { "Escuchando..." }.uppercase()
@@ -208,17 +220,16 @@ fun AnalyzerScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Boton de capturar muestra de 3s
         Box(
             modifier = Modifier
                 .size(65.dp)
                 .neumorphic(cornerRadius = 42.dp)
                 .background(NeumorphicBackground, shape = CircleShape)
-                .clickable(enabled = !state.isCapturing && !state.isSaving) {
-                    if (currentLocation == null) {
+                .clickable(enabled = !state.isSaving) {
+                    if (!state.isCapturing && currentLocation == null) {
                         onRequestLocationPermission()
                     }
-                    viewModel.startCaptureSession(currentLocation)
+                    viewModel.toggleCaptureSession(currentLocation)
                 },
             contentAlignment = Alignment.Center
         ) {
@@ -229,7 +240,7 @@ fun AnalyzerScreen(
                     .background(if (state.isCapturing) TextGray else PowerOrange)
             )
         }
-        
+
         Spacer(modifier = Modifier.height(16.dp))
     }
 

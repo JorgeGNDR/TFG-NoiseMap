@@ -1,13 +1,35 @@
 package com.gandara.tfgjorgegandara.presentation.settings
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -37,7 +59,6 @@ fun SettingsScreen(
     onBufferSizeChange: (Int) -> Unit,
     onCalibrationOffsetChange: (Float) -> Unit
 ) {
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -52,7 +73,7 @@ fun SettingsScreen(
             fontWeight = FontWeight.Bold
         )
 
-        SettingsPanel(title = "Analisis del espectro") {
+        SettingsPanel(title = "Análisis del espectro") {
             BufferSizeDropdown(
                 selectedBufferSize = settings.spectrumBufferSize,
                 availableBufferSizes = availableBufferSizes,
@@ -68,7 +89,7 @@ fun SettingsScreen(
             )
         }
 
-        SettingsPanel(title = "Calibracion") {
+        SettingsPanel(title = "Calibración") {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -102,12 +123,12 @@ fun SettingsScreen(
             )
         }
 
-        SettingsPanel(title = "Como usar la app") {
+        SettingsPanel(title = "Cómo usar la app") {
             InfoLine("Analizador", "Muestra el nivel actual, la media, el pico, el espectro y el sonido detectado.")
-            InfoLine("Capturar", "Pulsa el boton circular para guardar una muestra de 3 segundos con ubicacion.")
-            InfoLine("Mapa", "Visualiza las muestras por nivel global o por tercio de octava. Usa el filtro de tiempo para ver datos antiguos.")
-            InfoLine("Historial", "Revisa cada medicion, borra muestras y genera una explicacion breve con IA.")
-            InfoLine("Calibracion", "Usa el offset solo si tienes una referencia fiable, como un sonometro o una medicion conocida.")
+            InfoLine("Capturar", "Pulsa el botón circular para iniciar o detener una sesión. La app guarda segmentos geolocalizados durante la sesión.")
+            InfoLine("Mapa", "Visualiza las mediciones por nivel global o por tercio de octava. Usa los filtros de tiempo y franja horaria para comparar momentos.")
+            InfoLine("Historial", "Revisa cada medición, borra muestras y genera una explicación breve con IA.")
+            InfoLine("Calibración", "Usa el offset solo si tienes una referencia fiable, como un sonómetro o una medición conocida.")
         }
     }
 }
