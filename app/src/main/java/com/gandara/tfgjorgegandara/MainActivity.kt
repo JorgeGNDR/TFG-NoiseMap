@@ -32,14 +32,14 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.gandara.tfgjorgegandara.data.settings.AppSettings
-import com.gandara.tfgjorgegandara.ui.analyzer.AnalyzerScreen
-import com.gandara.tfgjorgegandara.ui.common.LocationViewModel
-import com.gandara.tfgjorgegandara.ui.history.HistoryScreen
-import com.gandara.tfgjorgegandara.ui.history.HistoryViewModel
-import com.gandara.tfgjorgegandara.ui.map.MapScreen
-import com.gandara.tfgjorgegandara.ui.settings.SettingsScreen
-import com.gandara.tfgjorgegandara.ui.theme.NoiseMapTheme
+import com.gandara.tfgjorgegandara.di.AppContainer
+import com.gandara.tfgjorgegandara.presentation.analyzer.AnalyzerScreen
+import com.gandara.tfgjorgegandara.presentation.common.LocationViewModel
+import com.gandara.tfgjorgegandara.presentation.history.HistoryScreen
+import com.gandara.tfgjorgegandara.presentation.history.HistoryViewModel
+import com.gandara.tfgjorgegandara.presentation.map.MapScreen
+import com.gandara.tfgjorgegandara.presentation.settings.SettingsRoute
+import com.gandara.tfgjorgegandara.presentation.theme.NoiseMapTheme
 import org.maplibre.android.MapLibre
 
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
@@ -55,7 +55,7 @@ class MainActivity : ComponentActivity() {
 
         // Inicializa MapLibre y Configuración
         MapLibre.getInstance(this)
-        AppSettings.init(this)
+        AppContainer.settings(this)
 
         setContent {
             NoiseMapTheme {
@@ -63,50 +63,78 @@ class MainActivity : ComponentActivity() {
                 val context = LocalContext.current
                 val lifecycleOwner = LocalLifecycleOwner.current
 
-                // Declaración de los permisos necesarios
-                val permissions = arrayOf(
-                    Manifest.permission.RECORD_AUDIO,
+                val locationPermissions = arrayOf(
                     Manifest.permission.ACCESS_FINE_LOCATION,
                     Manifest.permission.ACCESS_COARSE_LOCATION
                 )
 
-                var permissionsGranted by remember {
+                var audioPermissionGranted by remember {
                     mutableStateOf(
-                        ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED &&
-                            (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-                                ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED)
+                        ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.RECORD_AUDIO
+                        ) == PackageManager.PERMISSION_GRANTED
                     )
                 }
+                var locationPermissionGranted by remember {
+                    mutableStateOf(
+                        ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                        ) == PackageManager.PERMISSION_GRANTED ||
+                            ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.ACCESS_COARSE_LOCATION
+                            ) == PackageManager.PERMISSION_GRANTED
+                    )
+                }
+                var locationPermissionRequested by remember { mutableStateOf(false) }
 
-                // Lanzador de solicitud de permisos
-                val permissionLauncher = rememberLauncherForActivityResult(
+                val locationPermissionLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestMultiplePermissions(),
                     onResult = { result ->
-                        val audioOk = result[Manifest.permission.RECORD_AUDIO] ?: false
-                        val locationOk = (result[Manifest.permission.ACCESS_FINE_LOCATION] ?: false) ||
+                        locationPermissionGranted =
+                            (result[Manifest.permission.ACCESS_FINE_LOCATION] ?: false) ||
                             (result[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false)
-                        permissionsGranted = audioOk && locationOk
                     }
                 )
 
-                // Comprobamos si tenemos permisos ya o si todavía no tenemos. Si no, se solicitan
+                val audioPermissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission(),
+                    onResult = { granted -> audioPermissionGranted = granted }
+                )
+
                 LaunchedEffect(Unit) {
-                    if (!permissionsGranted) {
-                        permissionLauncher.launch(permissions)
+                    if (!audioPermissionGranted) {
+                        audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                }
+
+                LaunchedEffect(audioPermissionGranted) {
+                    if (audioPermissionGranted &&
+                        !locationPermissionGranted &&
+                        !locationPermissionRequested
+                    ) {
+                        locationPermissionRequested = true
+                        locationPermissionLauncher.launch(locationPermissions)
                     }
                 }
 
                 DisposableEffect(lifecycleOwner) {
                     val observer = LifecycleEventObserver { _, event ->
                         if (event == Lifecycle.Event.ON_RESUME) {
-                            val audioOk = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-                            val locationOk = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-                                ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-
-                            permissionsGranted = audioOk && locationOk
-                            if (!permissionsGranted) {
-                                permissionLauncher.launch(permissions)
-                            }
+                            audioPermissionGranted = ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.RECORD_AUDIO
+                            ) == PackageManager.PERMISSION_GRANTED
+                            locationPermissionGranted = ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.ACCESS_FINE_LOCATION
+                            ) == PackageManager.PERMISSION_GRANTED ||
+                                ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                ) == PackageManager.PERMISSION_GRANTED
                         }
                     }
                     lifecycleOwner.lifecycle.addObserver(observer)
@@ -114,8 +142,8 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val locationViewModel: LocationViewModel = viewModel()
-                LaunchedEffect(permissionsGranted) {
-                    if (permissionsGranted) {
+                LaunchedEffect(locationPermissionGranted) {
+                    if (locationPermissionGranted) {
                         locationViewModel.startLocationUpdates()
                     }
                 }
@@ -125,14 +153,20 @@ class MainActivity : ComponentActivity() {
                 Scaffold(
                     bottomBar = { BottomBar(navController) }
                 ) { innerPadding ->
-                    if (permissionsGranted) {
+                    if (audioPermissionGranted) {
                         NavHost(
                             navController = navController,
                             startDestination = Screen.Analyzer.route,
                             modifier = Modifier.padding(innerPadding)
                         ) {
                             composable(Screen.Analyzer.route) {
-                                AnalyzerScreen(locationViewModel = locationViewModel)
+                                AnalyzerScreen(
+                                    locationViewModel = locationViewModel,
+                                    onRequestLocationPermission = {
+                                        locationPermissionRequested = true
+                                        locationPermissionLauncher.launch(locationPermissions)
+                                    }
+                                )
                             }
                             composable(Screen.Map.route) {
                                 MapScreen(
@@ -145,13 +179,15 @@ class MainActivity : ComponentActivity() {
                                 HistoryScreen(viewModel = historyViewModel)
                             }
                             composable(Screen.Settings.route) {
-                                SettingsScreen()
+                                SettingsRoute()
                             }
                         }
                     } else {
                         PermissionWaitingScreen(
                             modifier = Modifier.padding(innerPadding),
-                            onRequestPermissions = { permissionLauncher.launch(permissions) }
+                            onRequestPermissions = {
+                                audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                            }
                         )
                     }
                 }
@@ -180,7 +216,7 @@ private fun PermissionWaitingScreen(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "La app necesita micrófono y ubicación para analizar y guardar muestras de ruido.",
+            text = "La app necesita acceso al micrófono para analizar el sonido. La ubicación solo se solicita para guardar muestras geolocalizadas.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

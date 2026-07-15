@@ -5,16 +5,15 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.util.Log
+import com.gandara.tfgjorgegandara.domain.audio.AudioCaptureSource
 import kotlinx.coroutines.*
-import kotlin.math.log10
 import kotlin.math.max
-import kotlin.math.sqrt
 
 /**
  * Gestor de la captura de audio crudo desde el hardware del dispositivo.
  * Se encarga de la configuración del buffer y la ejecución del hilo de lectura.
  */
-class AudioCaptureManager(private val fftSize: Int = 4096) {
+class AudioCaptureManager(private val fftSize: Int = 4096) : AudioCaptureSource {
     private val sampleRate = 44100
     private val channelConfig = AudioFormat.CHANNEL_IN_MONO
     private val audioFormat = AudioFormat.ENCODING_PCM_16BIT
@@ -24,15 +23,12 @@ class AudioCaptureManager(private val fftSize: Int = 4096) {
 
     private var audioRecord: AudioRecord? = null
     private var isRecording = false
-    var offset = 100.0
 
     private var captureJob: Job? = null
     private val captureScope = CoroutineScope(Dispatchers.IO)
 
-    // Inicia la captura de audio
-
     @SuppressLint("MissingPermission")
-    fun startRecording(onDataReady: (ShortArray, Double) -> Unit) {
+    fun startRecording(onDataReady: (ShortArray) -> Unit) {
         if (isRecording) return
 
         try {
@@ -57,8 +53,7 @@ class AudioCaptureManager(private val fftSize: Int = 4096) {
                 while (isActive && isRecording) {
                     val samplesRead = audioRecord?.read(dataBuffer, 0, dataBuffer.size) ?: 0
                     if (samplesRead == dataBuffer.size) {
-                        val db = calculateDb(dataBuffer)
-                        onDataReady(dataBuffer.clone(), db)
+                        onDataReady(dataBuffer.clone())
                     }
                 }
             }
@@ -84,25 +79,11 @@ class AudioCaptureManager(private val fftSize: Int = 4096) {
         audioRecord = null
     }
 
-    /**
-     * Calcula el nivel de presión sonora (dB SPL aproximado) utilizando el valor RMS de las muestras.
-     */
-    private fun calculateDb(samples: ShortArray): Double {
-        var sumOfSquares = 0.0
-        for (sample in samples) {
-            // Normalización de la muestra de 16 bits al rango [-1.0, 1.0]
-            val normalized = sample / 32768.0
-            sumOfSquares += normalized * normalized
-        }
-        
-        // Root Mean Square (Valor Eficaz)
-        val rms = sqrt(sumOfSquares / samples.size)
+    override fun start(onAudioData: (ShortArray) -> Unit) {
+        startRecording { samples -> onAudioData(samples) }
+    }
 
-        // Conversión a escala logarítmica (decibelios) aplicando el offset de calibración
-        return if (rms > 1e-9) {
-            20 * log10(rms) + offset
-        } else {
-            0.0
-        }
+    override fun stop() {
+        stopRecording()
     }
 }

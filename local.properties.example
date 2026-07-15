@@ -1,0 +1,4 @@
+# Copia las propiedades necesarias a local.properties en cada ordenador.
+# local.properties está ignorado por Git y no debe contenerse en commits.
+sdk.dir=C\:\\ruta\\al\\Android\\Sdk
+MAPTILER_API_KEY=tu_clave_de_maptiler

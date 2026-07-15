@@ -1,8 +1,9 @@
 ﻿package com.gandara.tfgjorgegandara.data.ml
 
 import android.content.Context
-import android.media.AudioRecord
 import android.util.Log
+import com.gandara.tfgjorgegandara.domain.audio.SoundClassificationResult
+import com.gandara.tfgjorgegandara.domain.audio.SoundClassifier
 import org.tensorflow.lite.task.audio.classifier.AudioClassifier
 import org.tensorflow.lite.support.audio.TensorAudio
 import org.tensorflow.lite.task.core.BaseOptions
@@ -11,10 +12,16 @@ import org.tensorflow.lite.task.core.BaseOptions
  * Gestor del motor de inferencia TensorFlow Lite para la clasificación de sonidos ambientales.
  * Utiliza el modelo pre-entrenado YAMNet.
  */
-class SoundClassifierManager(context: Context) {
+class SoundClassifierManager(context: Context) : SoundClassifier {
     private var classifier: AudioClassifier? = null
     private var tensorAudio: TensorAudio? = null
-    private var audioRecord: AudioRecord? = null
+    private var resampler: StreamingLinearResampler? = null
+    private var sourceSampleRate: Int? = null
+    private var inputWindow = FloatArray(0)
+    private var inputWriteIndex = 0
+    private var collectedSamples = 0
+    private val audioBufferLock = Any()
+    private val inferenceLock = Any()
 
     companion object {
         private const val TAG = "SoundClassifierManager"
@@ -36,9 +43,9 @@ class SoundClassifierManager(context: Context) {
             // Inicialización del motor de TFLite
             classifier = AudioClassifier.createFromFileAndOptions(context, MODEL_PATH, options)
             
-            // Configuración automatizada del buffer de audio conforme a los requisitos del modelo (16 kHz)
+            // Tensor y ventana de entrada configurados según los metadatos de YAMNet.
             tensorAudio = classifier?.createInputTensorAudio()
-            audioRecord = classifier?.createAudioRecord()
+            inputWindow = FloatArray(classifier?.requiredInputBufferSize?.toInt() ?: 0)
 
             Log.d(TAG, "Motor YAMNet inicializado correctamente.")
         } catch (e: Exception) {
@@ -47,58 +54,76 @@ class SoundClassifierManager(context: Context) {
     }
 
     /**
-     * Inicia la captura de audio en el hilo de procesamiento de audio.
+     * Recibe el mismo audio capturado para el analizador y conserva la última
+     * ventana requerida por YAMNet, remuestreada a la frecuencia del modelo.
      */
-    fun start() {
-        try {
-            audioRecord?.startRecording()
-        } catch (e: Exception) {
-            Log.e(TAG, "No se pudo activar la captura para el motor ML: ${e.message}")
+    override fun offerAudio(samples: ShortArray, sampleRate: Int) {
+        val currentClassifier = classifier ?: return
+        if (inputWindow.isEmpty()) return
+
+        val currentResampler = synchronized(audioBufferLock) {
+            if (resampler == null || sourceSampleRate != sampleRate) {
+                sourceSampleRate = sampleRate
+                resampler = StreamingLinearResampler(
+                    sourceSampleRate = sampleRate,
+                    targetSampleRate = currentClassifier.requiredTensorAudioFormat.sampleRate
+                )
+                inputWriteIndex = 0
+                collectedSamples = 0
+            }
+            resampler!!
+        }
+
+        val resampledSamples = currentResampler.process(samples)
+        synchronized(audioBufferLock) {
+            resampledSamples.forEach { sample ->
+                inputWindow[inputWriteIndex] = sample
+                inputWriteIndex = (inputWriteIndex + 1) % inputWindow.size
+                collectedSamples = (collectedSamples + 1).coerceAtMost(inputWindow.size)
+            }
         }
     }
 
     /**
-     * Detiene la captura de audio.
+     * Clasifica la última ventana completa recibida desde la captura compartida.
      */
-    fun stop() {
-        try {
-            audioRecord?.stop()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error al detener la captura ML.")
-        }
-    }
+    override fun classifyLatest(): SoundClassificationResult {
+        val currentClassifier = classifier ?: return SoundClassificationResult("Inicializando...")
+        val currentTensor = tensorAudio ?: return SoundClassificationResult("Cargando...")
 
-    /**
-     * Realiza la clasificación del sonido actual leyendo directamente de su propio flujo de audio.
-     * Este método garantiza que YAMNet reciba el contexto completo (aprox 1s) que necesita.
-     */
-    fun classifyContinuous(): String {
-        val currentClassifier = classifier ?: return "Inicializando..."
-        val currentTensor = tensorAudio ?: return "Cargando..."
+        val latestWindow = synchronized(audioBufferLock) {
+            if (collectedSamples < inputWindow.size) return SoundClassificationResult("Analizando...")
+
+            FloatArray(inputWindow.size) { index ->
+                inputWindow[(inputWriteIndex + index) % inputWindow.size]
+            }
+        }
 
         return try {
-            // Lee los datos del micrófono interno configurado por TensorFlow a 16kHz
-            currentTensor.load(audioRecord)
-            val results = currentClassifier.classify(currentTensor)
+            val results = synchronized(inferenceLock) {
+                currentTensor.load(latestWindow)
+                currentClassifier.classify(currentTensor)
+            }
             val topCategory = results.firstOrNull()?.categories?.firstOrNull()
 
             if (topCategory != null && topCategory.score > 0.3f) {
-                "${topCategory.label} (${(topCategory.score * 100).toInt()}%)"
+                SoundClassificationResult(
+                    label = topCategory.label,
+                    probability = topCategory.score
+                )
             } else {
-                "Analizando..."
+                SoundClassificationResult("Analizando...")
             }
         } catch (e: Exception) {
-            "Error al leer datos del micrófono. Comprueba permisos"
+            SoundClassificationResult("Error al leer datos del micrófono. Comprueba permisos")
         }
     }
 
     /**
      * Libera los recursos del motor de inferencia y la captura de audio.
      */
-    fun close() {
+    override fun close() {
         try {
-            stop()
-            audioRecord?.release()
             classifier?.close()
         } catch (e: Exception) {
             Log.e(TAG, "Error al liberar recursos del gestor ML.")
