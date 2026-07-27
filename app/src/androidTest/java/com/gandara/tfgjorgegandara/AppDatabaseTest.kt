@@ -38,6 +38,7 @@ class AppDatabaseTest {
         val sampleId = database.audioSampleDao().insertSampleAndGetId(
             AudioSample(
                 timestamp = 1_000L,
+                durationMs = 5_000L,
                 latitude = 39.48,
                 longitude = -0.34,
                 avgDb = 55f,

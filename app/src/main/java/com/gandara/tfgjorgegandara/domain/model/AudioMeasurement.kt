@@ -6,7 +6,7 @@ package com.gandara.tfgjorgegandara.domain.model
 data class AudioMeasurement(
     val sessionId: Long? = null,
     val timestamp: Long = System.currentTimeMillis(),
-    val durationMs: Long = 3000L,
+    val durationMs: Long,
     val avgDb: Float,
     val peakDb: Float,
     val latitude: Double,

@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.DatePickerDialog
 import android.content.Context
 import android.content.pm.PackageManager
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -34,6 +36,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -45,10 +48,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -76,6 +82,12 @@ import org.maplibre.geojson.Point
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
+
+private val HeatmapLowColor = Color(0xFF4CAF50)
+private val HeatmapMediumColor = Color(0xFFFBC02D)
+private val HeatmapHighColor = Color(0xFFF57C00)
+private val HeatmapVeryHighColor = Color(0xFFD32F2F)
+private val HeatmapMaximumColor = Color(0xFFB71C1C)
 
 @Composable
 fun MapScreen(
@@ -274,11 +286,11 @@ private fun setupHeatmapLayer(style: Style) {
             Expression.interpolate(
                 Expression.linear(), Expression.heatmapDensity(),
                 Expression.stop(0.0, Expression.color(Color.Transparent.toArgb())),
-                Expression.stop(0.1, Expression.color(Color(0xFF4CAF50).toArgb())),
-                Expression.stop(0.4, Expression.color(Color(0xFFFBC02D).toArgb())),
-                Expression.stop(0.6, Expression.color(Color(0xFFF57C00).toArgb())),
-                Expression.stop(0.8, Expression.color(Color(0xFFD32F2F).toArgb())),
-                Expression.stop(1.0, Expression.color(Color(0xFFB71C1C).toArgb()))
+                Expression.stop(0.1, Expression.color(HeatmapLowColor.toArgb())),
+                Expression.stop(0.4, Expression.color(HeatmapMediumColor.toArgb())),
+                Expression.stop(0.6, Expression.color(HeatmapHighColor.toArgb())),
+                Expression.stop(0.8, Expression.color(HeatmapVeryHighColor.toArgb())),
+                Expression.stop(1.0, Expression.color(HeatmapMaximumColor.toArgb()))
             )
         ),
         PropertyFactory.heatmapOpacity(0.8f)
@@ -302,6 +314,8 @@ fun FrequencySlicerCard(
     onLocateClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var showMapInfo by remember { mutableStateOf(false) }
+
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)),
@@ -323,6 +337,24 @@ fun FrequencySlicerCard(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
+
+                FilledIconButton(
+                    onClick = { showMapInfo = true },
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .semantics { contentDescription = "Información sobre el mapa" },
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                ) {
+                    Text(
+                        text = "?",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
 
                 FilledIconButton(
                     onClick = onLocateClick,
@@ -371,6 +403,98 @@ fun FrequencySlicerCard(
                 onEndHourChange = onEndHourChange
             )
         }
+    }
+
+    if (showMapInfo) {
+        MapInfoDialog(onDismiss = { showMapInfo = false })
+    }
+}
+
+@Composable
+private fun MapInfoDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Información del mapa") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "Leyenda del mapa de calor",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(16.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(
+                                    HeatmapLowColor,
+                                    HeatmapMediumColor,
+                                    HeatmapHighColor,
+                                    HeatmapVeryHighColor,
+                                    HeatmapMaximumColor
+                                )
+                            )
+                        )
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Menor", style = MaterialTheme.typography.labelSmall)
+                    Text("Mayor", style = MaterialTheme.typography.labelSmall)
+                }
+
+                Text(
+                    text = "El color combina el nivel relativo de las mediciones con la concentración de puntos cercanos. Las zonas sin datos permanecen transparentes.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+
+                MapInfoLine(
+                    title = "Periodo",
+                    body = "Limita las mediciones a las últimas horas o días, una fecha concreta, un rango o todo el historial."
+                )
+                MapInfoLine(
+                    title = "Horario",
+                    body = "Muestra todo el día o únicamente las mediciones realizadas entre las horas seleccionadas."
+                )
+                MapInfoLine(
+                    title = "Frecuencia",
+                    body = "El nivel global representa el valor medio de la muestra. Al elegir una banda se muestra solo esa zona del espectro."
+                )
+
+                Text(
+                    text = "La escala facilita la comparación entre zonas, pero no representa por sí sola un valor exacto en decibelios.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Entendido")
+            }
+        }
+    )
+}
+
+@Composable
+private fun MapInfoLine(title: String, body: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text = body,
+            style = MaterialTheme.typography.bodySmall
+        )
     }
 }
 

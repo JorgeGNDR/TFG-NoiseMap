@@ -25,7 +25,7 @@ data class AudioSample(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val sessionId: Long? = null,
     val timestamp: Long,
-    val durationMs: Long = 3000L,
+    val durationMs: Long,
     val latitude: Double,
     val longitude: Double,
     val avgDb: Float,
