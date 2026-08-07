@@ -20,6 +20,18 @@ class AcousticProcessingTest {
     }
 
     @Test
+    fun energeticMeanTakesSegmentDurationIntoAccount() {
+        val mean = DecibelMath.durationWeightedMeanDb(
+            listOf(
+                60.0 to 5_000L,
+                40.0 to 3_000L
+            )
+        )
+
+        assertEquals(57.98, mean, 0.01)
+    }
+
+    @Test
     fun fftFindsTheFrequencyOfASyntheticTone() {
         val sampleRate = 44_100
         val fftSize = 4_096

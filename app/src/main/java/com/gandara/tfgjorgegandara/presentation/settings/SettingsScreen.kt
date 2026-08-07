@@ -127,7 +127,7 @@ fun SettingsScreen(
             InfoLine("Analizador", "Muestra el nivel actual, la media, el pico, el espectro y el sonido detectado.")
             InfoLine("Capturar", "Pulsa el botón circular para iniciar o detener una sesión. La app guarda segmentos geolocalizados durante la sesión.")
             InfoLine("Mapa", "Visualiza las mediciones por nivel global o por tercio de octava. Usa los filtros de tiempo y franja horaria para comparar momentos.")
-            InfoLine("Historial", "Revisa cada medición, borra muestras y genera una explicación breve con IA.")
+            InfoLine("Historial", "Revisa las sesiones y sus muestras, borra registros y genera explicaciones breves con IA.")
             InfoLine("Calibración", "Usa el offset solo si tienes una referencia fiable, como un sonómetro o una medición conocida.")
         }
     }

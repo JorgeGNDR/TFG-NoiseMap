@@ -4,7 +4,10 @@ import android.Manifest
 import android.app.DatePickerDialog
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.LocationOn
@@ -44,13 +48,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.semantics.contentDescription
@@ -70,24 +75,23 @@ import kotlinx.coroutines.withContext
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.geometry.LatLngQuad
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
-import org.maplibre.android.style.expressions.Expression
-import org.maplibre.android.style.layers.HeatmapLayer
+import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
-import org.maplibre.android.style.sources.GeoJsonSource
-import org.maplibre.geojson.Feature
-import org.maplibre.geojson.FeatureCollection
-import org.maplibre.geojson.Point
+import org.maplibre.android.style.layers.RasterLayer
+import org.maplibre.android.style.sources.ImageSource
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
-private val HeatmapLowColor = Color(0xFF4CAF50)
-private val HeatmapMediumColor = Color(0xFFFBC02D)
-private val HeatmapHighColor = Color(0xFFF57C00)
-private val HeatmapVeryHighColor = Color(0xFFD32F2F)
-private val HeatmapMaximumColor = Color(0xFFB71C1C)
+private val NoiseGreen = Color(NoiseSurfaceRenderer.GREEN_COLOR)
+private val NoiseYellow = Color(NoiseSurfaceRenderer.YELLOW_COLOR)
+private val NoiseOrange = Color(NoiseSurfaceRenderer.ORANGE_COLOR)
+private val NoiseRed = Color(NoiseSurfaceRenderer.RED_COLOR)
+private const val NOISE_SURFACE_SOURCE_ID = "noise-surface-source"
+private const val NOISE_SURFACE_LAYER_ID = "noise-surface-layer"
 
 @Composable
 fun MapScreen(
@@ -97,7 +101,7 @@ fun MapScreen(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val heatmapPoints by mapViewModel.heatmapPoints.collectAsState()
+    val noiseSurface by mapViewModel.noiseSurface.collectAsState()
     val currentLocation by locationViewModel.currentLocation.collectAsState()
     val isLoading by mapViewModel.isLoading.collectAsState()
     val errorMessage by mapViewModel.errorMessage.collectAsState()
@@ -135,23 +139,23 @@ fun MapScreen(
         }
     }
 
-    LaunchedEffect(heatmapPoints, mapLibreMap) {
+    LaunchedEffect(noiseSurface, mapLibreMap) {
         val map = mapLibreMap ?: return@LaunchedEffect
-
-        val featureCollection = withContext(Dispatchers.Default) {
-            val features = heatmapPoints.map { point ->
-                Feature.fromGeometry(
-                    Point.fromLngLat(point.geoPoint.longitude, point.geoPoint.latitude)
-                ).apply {
-                    addNumberProperty("db", point.rawDb)
-                    addNumberProperty("intensity", point.intensity)
-                }
-            }
-            FeatureCollection.fromFeatures(features)
+        val surface = noiseSurface ?: return@LaunchedEffect
+        val bitmap = withContext(Dispatchers.Default) {
+            NoiseSurfaceRenderer.render(
+                surface = surface,
+                viewportWidth = mapView.width,
+                viewportHeight = mapView.height
+            )
         }
+        val coordinates = surface.bounds.toLatLngQuad()
 
         map.getStyle { style ->
-            style.getSourceAs<GeoJsonSource>("noise-source")?.setGeoJson(featureCollection)
+            style.getSourceAs<ImageSource>(NOISE_SURFACE_SOURCE_ID)?.apply {
+                setCoordinates(coordinates)
+                setImage(bitmap)
+            }
         }
     }
 
@@ -166,7 +170,7 @@ fun MapScreen(
                         val mapStyleUrl = "https://api.maptiler.com/maps/dataviz-v4/style.json" +
                             "?key=${BuildConfig.MAPTILER_API_KEY}"
                         map.setStyle(Style.Builder().fromUri(mapStyleUrl)) { style ->
-                            setupHeatmapLayer(style)
+                            setupNoiseSurfaceLayer(style)
 
                             if (context.hasLocationPermission()) {
                                 map.locationComponent.apply {
@@ -259,43 +263,33 @@ fun MapScreen(
     }
 }
 
-private fun setupHeatmapLayer(style: Style) {
-    val source = GeoJsonSource("noise-source")
+private fun setupNoiseSurfaceLayer(style: Style) {
+    val initialCoordinates = LatLngQuad(
+        LatLng(0.001, -0.001),
+        LatLng(0.001, 0.001),
+        LatLng(-0.001, 0.001),
+        LatLng(-0.001, -0.001)
+    )
+    val emptyBitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+    val source = ImageSource(NOISE_SURFACE_SOURCE_ID, initialCoordinates, emptyBitmap)
     style.addSource(source)
 
-    val layer = HeatmapLayer("noise-heatmap", "noise-source")
+    val layer = RasterLayer(NOISE_SURFACE_LAYER_ID, NOISE_SURFACE_SOURCE_ID)
     layer.setProperties(
-        PropertyFactory.heatmapWeight(Expression.get("intensity")),
-        PropertyFactory.heatmapIntensity(
-            Expression.interpolate(
-                Expression.linear(), Expression.zoom(),
-                Expression.stop(0, 0.05f),
-                Expression.stop(10, 0.3f),
-                Expression.stop(15, 1.0f)
-            )
-        ),
-        PropertyFactory.heatmapRadius(
-            Expression.interpolate(
-                Expression.linear(), Expression.zoom(),
-                Expression.stop(0, 2),
-                Expression.stop(10, 15),
-                Expression.stop(20, 40)
-            )
-        ),
-        PropertyFactory.heatmapColor(
-            Expression.interpolate(
-                Expression.linear(), Expression.heatmapDensity(),
-                Expression.stop(0.0, Expression.color(Color.Transparent.toArgb())),
-                Expression.stop(0.1, Expression.color(HeatmapLowColor.toArgb())),
-                Expression.stop(0.4, Expression.color(HeatmapMediumColor.toArgb())),
-                Expression.stop(0.6, Expression.color(HeatmapHighColor.toArgb())),
-                Expression.stop(0.8, Expression.color(HeatmapVeryHighColor.toArgb())),
-                Expression.stop(1.0, Expression.color(HeatmapMaximumColor.toArgb()))
-            )
-        ),
-        PropertyFactory.heatmapOpacity(0.8f)
+        PropertyFactory.rasterOpacity(1.0f),
+        PropertyFactory.rasterFadeDuration(0.0f),
+        PropertyFactory.rasterResampling(Property.RASTER_RESAMPLING_LINEAR)
     )
     style.addLayer(layer)
+}
+
+private fun MapViewModel.MapBounds.toLatLngQuad(): LatLngQuad {
+    return LatLngQuad(
+        LatLng(maxLat, minLon),
+        LatLng(maxLat, maxLon),
+        LatLng(minLat, maxLon),
+        LatLng(minLat, minLon)
+    )
 }
 
 @Composable
@@ -315,6 +309,7 @@ fun FrequencySlicerCard(
     modifier: Modifier = Modifier
 ) {
     var showMapInfo by remember { mutableStateOf(false) }
+    var filtersExpanded by rememberSaveable { mutableStateOf(false) }
 
     Card(
         modifier = modifier,
@@ -370,38 +365,77 @@ fun FrequencySlicerCard(
                 }
             }
 
-            Slider(
-                value = selectedIndex.toFloat(),
-                onValueChange = { onIndexChange(it.toInt()) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(28.dp),
-                valueRange = -1f..30f,
-                steps = 0,
-                colors = SliderDefaults.colors(
-                    thumbColor = MaterialTheme.colorScheme.primary,
-                    activeTrackColor = MaterialTheme.colorScheme.primary,
-                    inactiveTrackColor = MaterialTheme.colorScheme.outlineVariant
+            TextButton(
+                onClick = { filtersExpanded = !filtersExpanded },
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+            ) {
+                Text(
+                    text = "Filtros del mapa",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold
                 )
-            )
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Global", style = MaterialTheme.typography.labelSmall)
-                Text("1 kHz", style = MaterialTheme.typography.labelSmall)
-                Text("16 kHz", style = MaterialTheme.typography.labelSmall)
+                Text(
+                    text = if (filtersExpanded) "Ocultar" else "Mostrar",
+                    style = MaterialTheme.typography.labelMedium
+                )
+                Icon(
+                    imageVector = Icons.Default.ArrowDropDown,
+                    modifier = Modifier.rotate(if (filtersExpanded) 180f else 0f),
+                    contentDescription = if (filtersExpanded) "Plegar filtros" else "Desplegar filtros"
+                )
             }
 
-            MapFilterControls(
-                dateFilter = dateFilter,
-                onDateFilterModeChange = onDateFilterModeChange,
-                onSingleDateChange = onSingleDateChange,
-                onRangeStartDateChange = onRangeStartDateChange,
-                onRangeEndDateChange = onRangeEndDateChange,
-                hourFilter = hourFilter,
-                onAllDayChange = onAllDayChange,
-                onStartHourChange = onStartHourChange,
-                onEndHourChange = onEndHourChange
-            )
+            if (!filtersExpanded) {
+                Text(
+                    text = "${dateFilter.label} · " +
+                        if (hourFilter.allDay) "Todo el día" else hourFilter.label,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+
+            AnimatedVisibility(visible = filtersExpanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Slider(
+                        value = selectedIndex.toFloat(),
+                        onValueChange = { onIndexChange(it.toInt()) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(28.dp),
+                        valueRange = -1f..30f,
+                        steps = 0,
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary,
+                            inactiveTrackColor = MaterialTheme.colorScheme.outlineVariant
+                        )
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Global", style = MaterialTheme.typography.labelSmall)
+                        Text("1 kHz", style = MaterialTheme.typography.labelSmall)
+                        Text("16 kHz", style = MaterialTheme.typography.labelSmall)
+                    }
+
+                    MapFilterControls(
+                        dateFilter = dateFilter,
+                        onDateFilterModeChange = onDateFilterModeChange,
+                        onSingleDateChange = onSingleDateChange,
+                        onRangeStartDateChange = onRangeStartDateChange,
+                        onRangeEndDateChange = onRangeEndDateChange,
+                        hourFilter = hourFilter,
+                        onAllDayChange = onAllDayChange,
+                        onStartHourChange = onStartHourChange,
+                        onEndHourChange = onEndHourChange
+                    )
+                }
+            }
         }
     }
 
@@ -416,9 +450,12 @@ private fun MapInfoDialog(onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         title = { Text("Información del mapa") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 Text(
-                    text = "Leyenda del mapa de calor",
+                    text = "Escala acústica orientativa",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
                 )
@@ -430,12 +467,11 @@ private fun MapInfoDialog(onDismiss: () -> Unit) {
                         .clip(RoundedCornerShape(8.dp))
                         .background(
                             Brush.horizontalGradient(
-                                listOf(
-                                    HeatmapLowColor,
-                                    HeatmapMediumColor,
-                                    HeatmapHighColor,
-                                    HeatmapVeryHighColor,
-                                    HeatmapMaximumColor
+                                colorStops = arrayOf(
+                                    0.0f to NoiseGreen,
+                                    0.375f to NoiseYellow,
+                                    0.625f to NoiseOrange,
+                                    1.0f to NoiseRed
                                 )
                             )
                         )
@@ -445,12 +481,27 @@ private fun MapInfoDialog(onDismiss: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Menor", style = MaterialTheme.typography.labelSmall)
-                    Text("Mayor", style = MaterialTheme.typography.labelSmall)
+                    Text("40 dB", style = MaterialTheme.typography.labelSmall)
+                    Text("55 dB", style = MaterialTheme.typography.labelSmall)
+                    Text("65 dB", style = MaterialTheme.typography.labelSmall)
+                    Text("80+ dB", style = MaterialTheme.typography.labelSmall)
                 }
 
                 Text(
-                    text = "El color combina el nivel relativo de las mediciones con la concentración de puntos cercanos. Las zonas sin datos permanecen transparentes.",
+                    text = "Verde: nivel bajo · Amarillo: moderado · " +
+                        "Naranja: alto · Rojo: muy alto",
+                    style = MaterialTheme.typography.bodySmall
+                )
+
+                Text(
+                    text = "Como referencia para zonas residenciales urbanizadas, " +
+                        "la normativa española establece 55 dB durante la noche y " +
+                        "65 dB durante el día y la tarde.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+
+                Text(
+                    text = "El color se obtiene a partir del nivel estimado para cada zona. Repetir varias mediciones con el mismo nivel no hace que la zona pase automáticamente a rojo.",
                     style = MaterialTheme.typography.bodySmall
                 )
 
@@ -468,7 +519,10 @@ private fun MapInfoDialog(onDismiss: () -> Unit) {
                 )
 
                 Text(
-                    text = "La escala facilita la comparación entre zonas, pero no representa por sí sola un valor exacto en decibelios.",
+                    text = "Los objetivos normativos se evalúan durante periodos prolongados. " +
+                        "Una medición breve no determina por sí sola su cumplimiento. " +
+                        "La superficie entre puntos es una interpolación visual y las " +
+                        "zonas alejadas de cualquier medición permanecen transparentes.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -542,12 +596,6 @@ private fun MapFilterControls(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text(
-            text = "Filtros del mapa",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold
-        )
-
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)

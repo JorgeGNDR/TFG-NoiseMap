@@ -19,4 +19,23 @@ object DecibelMath {
         }
         return if (count > 0) energyToDb(energySum / count, fallbackDb) else fallbackDb
     }
+
+    fun durationWeightedMeanDb(
+        values: Iterable<Pair<Double, Long>>,
+        fallbackDb: Double = 0.0
+    ): Double {
+        var weightedEnergySum = 0.0
+        var totalDurationMs = 0L
+        values.forEach { (db, durationMs) ->
+            if (durationMs > 0L) {
+                weightedEnergySum += dbToEnergy(db) * durationMs
+                totalDurationMs += durationMs
+            }
+        }
+        return if (totalDurationMs > 0L) {
+            energyToDb(weightedEnergySum / totalDurationMs, fallbackDb)
+        } else {
+            fallbackDb
+        }
+    }
 }

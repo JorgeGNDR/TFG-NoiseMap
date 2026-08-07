@@ -17,6 +17,8 @@ import com.gandara.tfgjorgegandara.domain.repository.HistoryRepository
 import com.gandara.tfgjorgegandara.domain.repository.NoiseExplanationRepository
 import com.gandara.tfgjorgegandara.domain.settings.SettingsRepository
 import com.gandara.tfgjorgegandara.domain.usecase.DeleteSampleUseCase
+import com.gandara.tfgjorgegandara.domain.usecase.DeleteSamplesUseCase
+import com.gandara.tfgjorgegandara.domain.usecase.DeleteSessionUseCase
 import com.gandara.tfgjorgegandara.domain.usecase.ExplainSampleUseCase
 import com.gandara.tfgjorgegandara.domain.usecase.CreateMeasurementSessionUseCase
 import com.gandara.tfgjorgegandara.domain.usecase.FinishMeasurementSessionUseCase
@@ -60,6 +62,8 @@ object AppContainer {
             observeHistory = ObserveHistoryUseCase(historyRepository),
             getSampleDetails = GetSampleDetailsUseCase(historyRepository),
             deleteSample = DeleteSampleUseCase(historyRepository),
+            deleteSamples = DeleteSamplesUseCase(historyRepository),
+            deleteSession = DeleteSessionUseCase(historyRepository),
             explainSample = ExplainSampleUseCase(
                 historyRepository,
                 noiseExplanationRepository()
@@ -81,6 +85,7 @@ object AppContainer {
     private fun historyRepository(context: Context): HistoryRepository {
         val db = AppDatabase.getDatabase(context.applicationContext)
         return RoomHistoryRepository(
+            db.measurementSessionDao(),
             db.audioSampleDao(),
             db.frequencyBinDao(),
             db.soundClassificationDao()

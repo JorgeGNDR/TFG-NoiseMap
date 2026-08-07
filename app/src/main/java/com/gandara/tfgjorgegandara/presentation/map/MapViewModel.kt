@@ -21,8 +21,8 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     private val getHeatmapData: GetHeatmapDataUseCase = AppContainer.getHeatmapData(application)
     private var updateJob: Job? = null
 
-    private val _heatmapPoints = MutableStateFlow<List<HeatMapPoint>>(emptyList())
-    val heatmapPoints: StateFlow<List<HeatMapPoint>> = _heatmapPoints.asStateFlow()
+    private val _noiseSurface = MutableStateFlow<NoiseSurfaceData?>(null)
+    val noiseSurface: StateFlow<NoiseSurfaceData?> = _noiseSurface.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -42,9 +42,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     private var currentBounds: MapBounds? = null
 
     companion object {
-        private const val MIN_DB = 20.0
-        private const val MAX_DB = 90.0
-        private const val MIN_VISIBLE_INTENSITY = 0.18
+        private const val QUERY_PADDING_RATIO = 0.15
     }
 
     data class MapBounds(
@@ -148,14 +146,15 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 val bandIndex = _selectedBandIndex.value
                 val dateFilter = _dateFilter.value
                 val hourFilter = _hourFilter.value
+                val surfaceBounds = expandedBounds(minLat, maxLat, minLon, maxLon)
 
                 val tiles = getHeatmapData(
                     HeatmapQuery(
                         octaveIndex = bandIndex,
-                        minLatitude = minLat,
-                        maxLatitude = maxLat,
-                        minLongitude = minLon,
-                        maxLongitude = maxLon,
+                        minLatitude = surfaceBounds.minLat,
+                        maxLatitude = surfaceBounds.maxLat,
+                        minLongitude = surfaceBounds.minLon,
+                        maxLongitude = surfaceBounds.maxLon,
                         startTimestamp = dateFilter.startTimestamp,
                         endTimestamp = dateFilter.endTimestamp,
                         startHour = hourFilter.activeStartHour,
@@ -163,13 +162,15 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 )
 
-                _heatmapPoints.value = tiles.map { tile ->
-                    HeatMapPoint(
-                        geoPoint = GeoPoint(tile.lat, tile.lon),
-                        intensity = normalizeDb(tile.avgDb, bandIndex == -1),
-                        rawDb = tile.avgDb
-                    )
-                }
+                _noiseSurface.value = NoiseSurfaceData(
+                    bounds = surfaceBounds,
+                    points = tiles.map { tile ->
+                        NoiseMapPoint(
+                            geoPoint = GeoPoint(tile.lat, tile.lon),
+                            rawDb = tile.avgDb
+                        )
+                    }
+                )
             } catch (e: Exception) {
                 _errorMessage.value = "No se pudieron cargar las mediciones del mapa"
             } finally {
@@ -182,14 +183,28 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         _errorMessage.value = null
     }
 
-    private fun normalizeDb(db: Double, isGlobal: Boolean): Double {
-        val min = if (isGlobal) MIN_DB else 0.0
-        val max = if (isGlobal) MAX_DB else 80.0
-        val normalized = ((db - min) / (max - min)).coerceIn(0.0, 1.0)
-        return if (normalized > 0.0) normalized.coerceAtLeast(MIN_VISIBLE_INTENSITY) else MIN_VISIBLE_INTENSITY
+    private fun expandedBounds(
+        minLat: Double,
+        maxLat: Double,
+        minLon: Double,
+        maxLon: Double
+    ): MapBounds {
+        val latitudePadding = (maxLat - minLat) * QUERY_PADDING_RATIO
+        val longitudePadding = (maxLon - minLon) * QUERY_PADDING_RATIO
+        return MapBounds(
+            minLat = (minLat - latitudePadding).coerceAtLeast(-85.0),
+            maxLat = (maxLat + latitudePadding).coerceAtMost(85.0),
+            minLon = (minLon - longitudePadding).coerceAtLeast(-180.0),
+            maxLon = (maxLon + longitudePadding).coerceAtMost(180.0)
+        )
     }
 
-    data class HeatMapPoint(val geoPoint: GeoPoint, val intensity: Double, val rawDb: Double)
+    data class NoiseSurfaceData(
+        val bounds: MapBounds,
+        val points: List<NoiseMapPoint>
+    )
+
+    data class NoiseMapPoint(val geoPoint: GeoPoint, val rawDb: Double)
 
     data class GeoPoint(val latitude: Double, val longitude: Double)
 

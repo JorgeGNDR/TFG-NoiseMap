@@ -61,6 +61,9 @@ interface AudioSampleDao {
     @androidx.room.Delete
     suspend fun deleteSample(sample: AudioSample)
 
+    @androidx.room.Delete
+    suspend fun deleteSamples(samples: List<AudioSample>)
+
     data class HeatmapSampleRow(
         val timestamp: Long,
         val latitude: Double,

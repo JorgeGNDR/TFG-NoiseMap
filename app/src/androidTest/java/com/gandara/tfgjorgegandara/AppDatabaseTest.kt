@@ -6,6 +6,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.gandara.tfgjorgegandara.data.local.AppDatabase
 import com.gandara.tfgjorgegandara.data.local.AudioSample
 import com.gandara.tfgjorgegandara.data.local.FrequencyBin
+import com.gandara.tfgjorgegandara.data.local.MeasurementSession
 import com.gandara.tfgjorgegandara.data.local.SoundClassification
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -62,6 +63,74 @@ class AppDatabaseTest {
 
         database.audioSampleDao().deleteSample(storedSample)
 
+        assertTrue(database.frequencyBinDao().getBinsForSample(sampleId).isEmpty())
+        assertTrue(database.soundClassificationDao().getClassificationsForSample(sampleId).isEmpty())
+    }
+
+    @Test
+    fun multipleSamplesAreDeletedTogether() = runBlocking {
+        val firstId = database.audioSampleDao().insertSampleAndGetId(
+            AudioSample(
+                timestamp = 1_000L,
+                durationMs = 5_000L,
+                latitude = 39.48,
+                longitude = -0.34,
+                avgDb = 50f,
+                peakDb = 58f,
+                weighting = "A"
+            )
+        )
+        val secondId = database.audioSampleDao().insertSampleAndGetId(
+            AudioSample(
+                timestamp = 2_000L,
+                durationMs = 5_000L,
+                latitude = 39.49,
+                longitude = -0.35,
+                avgDb = 60f,
+                peakDb = 68f,
+                weighting = "A"
+            )
+        )
+        database.frequencyBinDao().insertBins(
+            listOf(
+                FrequencyBin(firstId, 19, 45f),
+                FrequencyBin(secondId, 19, 55f)
+            )
+        )
+
+        val samples = database.audioSampleDao().getAllSamples().first()
+        database.audioSampleDao().deleteSamples(samples)
+
+        assertTrue(database.audioSampleDao().getAllSamples().first().isEmpty())
+        assertTrue(database.frequencyBinDao().getBinsForSample(firstId).isEmpty())
+        assertTrue(database.frequencyBinDao().getBinsForSample(secondId).isEmpty())
+    }
+
+    @Test
+    fun deletingSessionDeletesItsSamplesAndRelationsByCascade() = runBlocking {
+        val sessionId = database.measurementSessionDao().insertSession(
+            MeasurementSession(startTimestamp = 1_000L)
+        )
+        val sampleId = database.audioSampleDao().insertSampleAndGetId(
+            AudioSample(
+                sessionId = sessionId,
+                timestamp = 1_000L,
+                durationMs = 5_000L,
+                latitude = 39.48,
+                longitude = -0.34,
+                avgDb = 55f,
+                peakDb = 62f,
+                weighting = "A"
+            )
+        )
+        database.frequencyBinDao().insertBins(listOf(FrequencyBin(sampleId, 19, 50f)))
+        database.soundClassificationDao().insertClassifications(
+            listOf(SoundClassification(sampleId, "Vehicle", 0.82f))
+        )
+
+        database.measurementSessionDao().deleteSession(sessionId)
+
+        assertTrue(database.audioSampleDao().getAllSamples().first().isEmpty())
         assertTrue(database.frequencyBinDao().getBinsForSample(sampleId).isEmpty())
         assertTrue(database.soundClassificationDao().getClassificationsForSample(sampleId).isEmpty())
     }
