@@ -1,8 +1,11 @@
 package com.gandara.tfgjorgegandara
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -16,6 +19,7 @@ import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -24,6 +28,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -89,6 +94,10 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 var locationPermissionRequested by remember { mutableStateOf(false) }
+                var audioPermissionRequested by rememberSaveable { mutableStateOf(false) }
+                var audioPermissionPermanentlyDenied by rememberSaveable {
+                    mutableStateOf(false)
+                }
 
                 val locationPermissionLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestMultiplePermissions(),
@@ -101,11 +110,20 @@ class MainActivity : ComponentActivity() {
 
                 val audioPermissionLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestPermission(),
-                    onResult = { granted -> audioPermissionGranted = granted }
+                    onResult = { granted ->
+                        audioPermissionGranted = granted
+                        audioPermissionPermanentlyDenied = !granted &&
+                            audioPermissionRequested &&
+                            !ActivityCompat.shouldShowRequestPermissionRationale(
+                                this@MainActivity,
+                                Manifest.permission.RECORD_AUDIO
+                            )
+                    }
                 )
 
                 LaunchedEffect(Unit) {
-                    if (!audioPermissionGranted) {
+                    if (!audioPermissionGranted && !audioPermissionRequested) {
+                        audioPermissionRequested = true
                         audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                     }
                 }
@@ -127,6 +145,15 @@ class MainActivity : ComponentActivity() {
                                 context,
                                 Manifest.permission.RECORD_AUDIO
                             ) == PackageManager.PERMISSION_GRANTED
+                            if (audioPermissionGranted) {
+                                audioPermissionPermanentlyDenied = false
+                            } else if (audioPermissionRequested) {
+                                audioPermissionPermanentlyDenied =
+                                    !ActivityCompat.shouldShowRequestPermissionRationale(
+                                        this@MainActivity,
+                                        Manifest.permission.RECORD_AUDIO
+                                    )
+                            }
                             locationPermissionGranted = ContextCompat.checkSelfPermission(
                                 context,
                                 Manifest.permission.ACCESS_FINE_LOCATION
@@ -151,7 +178,11 @@ class MainActivity : ComponentActivity() {
                 // Cargamos las pantallas, por defecto la de Analyzer.
                 // Si los permisos no han sido concedidos cargamos la pantalla de permisos.
                 Scaffold(
-                    bottomBar = { BottomBar(navController) }
+                    bottomBar = {
+                        if (audioPermissionGranted) {
+                            BottomBar(navController)
+                        }
+                    }
                 ) { innerPadding ->
                     if (audioPermissionGranted) {
                         NavHost(
@@ -185,8 +216,19 @@ class MainActivity : ComponentActivity() {
                     } else {
                         PermissionWaitingScreen(
                             modifier = Modifier.padding(innerPadding),
+                            permissionPermanentlyDenied = audioPermissionPermanentlyDenied,
                             onRequestPermissions = {
-                                audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                if (audioPermissionPermanentlyDenied) {
+                                    context.startActivity(
+                                        Intent(
+                                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                            Uri.fromParts("package", context.packageName, null)
+                                        )
+                                    )
+                                } else {
+                                    audioPermissionRequested = true
+                                    audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                }
                             }
                         )
                     }
@@ -200,6 +242,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun PermissionWaitingScreen(
     modifier: Modifier = Modifier,
+    permissionPermanentlyDenied: Boolean,
     onRequestPermissions: () -> Unit
 ) {
     Column(
@@ -216,13 +259,17 @@ private fun PermissionWaitingScreen(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "La app necesita acceso al micrófono para analizar el sonido. La ubicación solo se solicita para guardar muestras geolocalizadas.",
+            text = if (permissionPermanentlyDenied) {
+                "El permiso del micrófono está bloqueado. Abre los ajustes de la aplicación para concederlo manualmente."
+            } else {
+                "La app necesita acceso al micrófono para analizar el sonido. La ubicación solo se solicita para guardar muestras geolocalizadas."
+            },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(modifier = Modifier.height(16.dp))
         Button(onClick = onRequestPermissions) {
-            Text("Conceder permisos")
+            Text(if (permissionPermanentlyDenied) "Abrir ajustes" else "Conceder permisos")
         }
     }
 }

@@ -31,7 +31,7 @@ object NoiseSurfaceRenderer {
     private const val MAX_BITMAP_WIDTH = 192
     private const val MAX_BITMAP_HEIGHT = 384
     private const val MIN_BITMAP_HEIGHT = 128
-    private const val INFLUENCE_RADIUS_METERS = 100.0
+    private const val INFLUENCE_RADIUS_METERS = 50.0
     private const val EARTH_RADIUS_METERS = 6_378_137.0
     private const val MAX_SURFACE_OPACITY = 0.82
 
