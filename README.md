@@ -7,8 +7,11 @@
 ![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack_Compose-4285F4)
 ![TFG](https://img.shields.io/badge/TFG-Ingeniería_Informática_%C2%B7_UPV-005A9C)
 
-NoiseMap permite explorar el entorno sonoro a través de mediciones en tiempo real, análisis de frecuencias y mapas de ruido. La aplicación utiliza el micrófono y la ubicación del dispositivo para guardar sesiones geolocalizadas, identificar sonidos ambientales y consultar cómo varían las mediciones según el lugar y el momento.
+NoiseMap es una aplicación Android para el análisis y mapeo del ruido ambiental que combina procesamiento digital de audio, clasificación automática de sonidos e inteligencia artificial generativa. Permite estudiar el entorno sonoro en tiempo real mediante la medición de niveles con ponderaciones A, C y Z, el análisis del espectro de frecuencias y su distribución en bandas de tercio de octava.
 
+La aplicación integra YAMNet, un modelo de aprendizaje automático ejecutado localmente con TensorFlow Lite, para identificar sonidos ambientales a partir de la señal del micrófono. Esta clasificación se realiza en el propio dispositivo, sin necesidad de enviar el audio a un servicio externo, y complementa las mediciones acústicas con información sobre las posibles fuentes sonoras.
+
+Las mediciones se organizan en sesiones geolocalizadas y se representan en mapas de ruido con filtros temporales y de frecuencia, facilitando la exploración de patrones espaciales y temporales. Además, la integración de Gemini a través de Firebase AI Logic permite generar explicaciones en lenguaje natural a partir de los resultados de cada muestra, acercando la información técnica a usuarios sin conocimientos especializados en acústica.
 Proyecto desarrollado por **Jorge Gándara Sanchis** como **Trabajo de Fin de Grado en Ingeniería Informática en la Universitat Politècnica de València (UPV)**.
 
 ## Contenido
